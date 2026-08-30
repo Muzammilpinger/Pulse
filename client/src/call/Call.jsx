@@ -8,28 +8,10 @@ export default function Call({ room }) {
 
   const [calling, setCalling] = useState(false);
 
-  async function startCall() {
-    localStream.current = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-    });
+  async function createPeerConnection() {
+    const pc = new RTCPeerConnection();
 
-    peerConnection.current = new RTCPeerConnection();
-
-    localStream.current.getTracks().forEach((track) => {
-      peerConnection.current.addTrack(track, localStream.current);
-    });
-
-    socket.current = createSignalingConnection(room, async (message) => {
-      if (message.type === "answer") {
-        await peerConnection.current.setRemoteDescription(message);
-      }
-
-      if (message.type === "ice-candidate") {
-        await peerConnection.current.addIceCandidate(message.candidate);
-      }
-    });
-
-    peerConnection.current.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
         socket.current.send(
           JSON.stringify({
@@ -40,11 +22,34 @@ export default function Call({ room }) {
       }
     };
 
-    const offer = await peerConnection.current.createOffer();
+    pc.ontrack = (event) => {
+      const audio = new Audio();
+      audio.srcObject = event.streams[0];
+      audio.play();
+    };
 
-    await peerConnection.current.setLocalDescription(offer);
+    peerConnection.current = pc;
 
-    socket.current.onopen = () => {
+    return pc;
+  }
+
+  async function startCall() {
+    localStream.current =
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const pc = await createPeerConnection();
+
+    localStream.current.getTracks().forEach((track) => {
+      pc.addTrack(track, localStream.current);
+    });
+
+    socket.current = createSignalingConnection(room, handleSignalingMessage);
+
+    socket.current.onopen = async () => {
+      const offer = await pc.createOffer();
+
+      await pc.setLocalDescription(offer);
+
       socket.current.send(
         JSON.stringify({
           type: "offer",
@@ -54,6 +59,50 @@ export default function Call({ room }) {
     };
 
     setCalling(true);
+  }
+
+  async function handleSignalingMessage(message) {
+    if (message.type === "offer") {
+      localStream.current =
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const pc = await createPeerConnection();
+
+      localStream.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStream.current);
+      });
+
+      await pc.setRemoteDescription({
+        type: "offer",
+        sdp: message.sdp,
+      });
+
+      const answer = await pc.createAnswer();
+
+      await pc.setLocalDescription(answer);
+
+      socket.current.send(
+        JSON.stringify({
+          type: "answer",
+          sdp: answer.sdp,
+        })
+      );
+
+      setCalling(true);
+    }
+
+    if (message.type === "answer") {
+      await peerConnection.current.setRemoteDescription({
+        type: "answer",
+        sdp: message.sdp,
+      });
+    }
+
+    if (message.type === "ice-candidate") {
+      await peerConnection.current.addIceCandidate(
+        message.candidate
+      );
+    }
   }
 
   return (
