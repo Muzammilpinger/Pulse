@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { connectWebSocket } from "./websocket";
+import Call from "../call/Call";
 
 const API_URL = "http://127.0.0.1:8001";
 
@@ -12,6 +13,7 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("offline");
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [showCall, setShowCall] = useState(false);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -385,26 +387,45 @@ export default function Chat() {
               </div>
             </div>
 
-            <div style={styles.liveStatus}>
-              <span
-                style={{
-                  ...styles.statusDot,
-                  background:
-                    status === "online"
-                      ? "#54e58a"
-                      : "#ff6262",
-                  boxShadow:
-                    status === "online"
-                      ? "0 0 10px rgba(84,229,138,.7)"
-                      : "0 0 10px rgba(255,98,98,.7)",
-                }}
-              />
+            <div style={styles.headerActions}>
+              <button
+                onClick={() => setShowCall((current) => !current)}
+                style={styles.headerVoiceButton}
+              >
+                🎙
+              </button>
 
-              {status === "online"
-                ? "Connected"
-                : "Disconnected"}
+              <div style={styles.liveStatus}>
+                <span
+                  style={{
+                    ...styles.statusDot,
+                    background:
+                      status === "online"
+                        ? "#54e58a"
+                        : "#ff6262",
+                    boxShadow:
+                      status === "online"
+                        ? "0 0 10px rgba(84,229,138,.7)"
+                        : "0 0 10px rgba(255,98,98,.7)",
+                  }}
+                />
+
+                {status === "online"
+                  ? "Connected"
+                  : "Disconnected"}
+              </div>
             </div>
           </header>
+
+          {showCall && (
+            <div style={styles.callPanel}>
+              <Call
+                room={room}
+                username={username}
+                onClose={() => setShowCall(false)}
+              />
+            </div>
+          )}
 
           {/* MESSAGES */}
 
@@ -974,11 +995,35 @@ const styles = {
     marginTop: "3px",
   },
 
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+
+  headerVoiceButton: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "10px",
+    border: "1px solid rgba(255,255,255,.06)",
+    background: "rgba(255,255,255,.025)",
+    color: "#778198",
+    cursor: "pointer",
+    fontSize: "14px",
+  },
+
   liveStatus: {
     color: "#778198",
     fontSize: "11px",
     display: "flex",
     alignItems: "center",
+  },
+
+  callPanel: {
+    flexShrink: 0,
+    padding: "12px 20px",
+    borderBottom: "1px solid rgba(255,255,255,.04)",
+    background: "rgba(84,229,138,.025)",
   },
 
   messages: {

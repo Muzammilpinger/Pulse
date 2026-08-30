@@ -10,11 +10,21 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:8
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   gateway:
     build:
@@ -25,8 +35,29 @@ services:
       DATABASE_URL: postgresql+asyncpg://pulse:pulse@postgres:5432/pulse
       REDIS_URL: redis://redis:6379
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  coturn:
+    image: coturn/coturn:latest
+    command:
+      - turnserver
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --fingerprint
+      - --lt-cred-mech
+      - --realm=pulse.local
+      - --user=pulse:pulse
+      - --listening-port=3478
+      - --min-port=49152
+      - --max-port=49252
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49152-49252:49152-49252/udp"
 
 volumes:
   postgres_data:
