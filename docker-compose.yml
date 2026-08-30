@@ -16,5 +16,17 @@ services:
     ports:
       - "6379:6379"
 
+  gateway:
+    build:
+      context: ./gateway
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://pulse:pulse@postgres:5432/pulse
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+
 volumes:
   postgres_data:
