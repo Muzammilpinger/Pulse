@@ -1,0 +1,23 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pulse-require-resource-bounds
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: resource-bounds
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [pulse]
+      validate:
+        message: Pulse containers need CPU and memory requests and limits.
+        pattern:
+          spec:
+            containers:
+              - name: "*"
+                resources:
+                  requests: {cpu: "?*", memory: "?*"}
+                  limits: {cpu: "?*", memory: "?*"}

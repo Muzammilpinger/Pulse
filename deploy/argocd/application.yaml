@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pulse
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Muzammilpinger/Pulse.git
+    targetRevision: main
+    path: deploy/helm/pulse
+    helm:
+      valueFiles: [values.yaml, values-gitops.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pulse
+  syncPolicy:
+    syncOptions: [CreateNamespace=true]
+    # Manual sync until image tags and externally created secrets are configured.

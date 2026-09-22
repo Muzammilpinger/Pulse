@@ -1,0 +1,5 @@
+# Replace all three tags with the SAME successful CI commit SHA before syncing.
+images:
+  gateway: ghcr.io/muzammilpinger/pulse-gateway:replace-with-commit-sha
+  client: ghcr.io/muzammilpinger/pulse-client:replace-with-commit-sha
+  signaling: ghcr.io/muzammilpinger/pulse-signaling:replace-with-commit-sha

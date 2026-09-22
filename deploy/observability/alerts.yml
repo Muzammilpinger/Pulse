@@ -1,0 +1,15 @@
+groups:
+  - name: pulse
+    rules:
+      - alert: PulseGatewayUnavailable
+        expr: sum(up{job="pulse-gateway"}) < 1
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: No gateway is reachable
+      - alert: PulseErrorSpike
+        expr: sum(rate(pulse_errors_total[5m])) > 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Pulse message errors exceed one per second

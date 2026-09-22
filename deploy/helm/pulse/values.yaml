@@ -1,0 +1,32 @@
+# A dedicated namespace supports exactly one release (stable service names).
+images:
+  gateway: pulse-gateway:local
+  client: pulse-client:local
+  signaling: pulse-signaling:local
+imagePullPolicy: IfNotPresent
+gatewayReplicas: 2
+# Create this Secret externally; never put credentials in values or Git.
+existingSecret: pulse-secrets
+allowedOrigins: http://localhost:8088
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: 500m, memory: 256Mi}
+postgres:
+  image: postgres:17-alpine
+  storage: 2Gi
+redis:
+  image: redis:8-alpine
+ingress:
+  enabled: false
+  className: nginx
+  host: pulse.local
+  tlsSecret: ""
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPU: 65
+networkPolicy:
+  enabled: true
+monitoring:
+  enabled: false

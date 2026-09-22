@@ -1,0 +1,91 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: dns}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: client-ingress}
+spec:
+  podSelector:
+    matchLabels: {app: client}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports: [{port: 8080, protocol: TCP}]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app: gateway}
+      ports: [{port: 8001, protocol: TCP}]
+    - to:
+        - podSelector:
+            matchLabels: {app: signaling}
+      ports: [{port: 8002, protocol: TCP}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: gateway}
+spec:
+  podSelector:
+    matchLabels: {app: gateway}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: client}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
+      ports: [{port: 8001, protocol: TCP}]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app: postgres}
+      ports: [{port: 5432, protocol: TCP}]
+    - to:
+        - podSelector:
+            matchLabels: {app: redis}
+      ports: [{port: 6379, protocol: TCP}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: signaling}
+spec:
+  podSelector:
+    matchLabels: {app: signaling}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: client}
+      ports: [{port: 8002, protocol: TCP}]
+{{- range $name, $port := dict "postgres" 5432 "redis" 6379 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: {{ $name }}}
+spec:
+  podSelector:
+    matchLabels: {app: {{ $name }}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: gateway}
+      ports: [{port: {{ $port }}, protocol: TCP}]
+{{- end }}
+{{- end }}
