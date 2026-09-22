@@ -32,3 +32,10 @@ htmlcov/
 
 # Docker
 docker-compose.override.yml
+
+# Browser artifacts
+client/test-results/
+client/playwright-report/
+
+.env.*
+!.env.example

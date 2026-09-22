@@ -1,272 +1,171 @@
-import React, { useRef, useState } from "react";
-import { createSignalingConnection } from "./signaling";
-
-export default function Call({ room, onClose }) {
-  const peerConnection = useRef(null);
-  const socket = useRef(null);
-  const localStream = useRef(null);
-
-  const [calling, setCalling] = useState(false);
-  const [muted, setMuted] = useState(false);
-
-  async function createPeerConnection() {
-    const pc = new RTCPeerConnection();
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && socket.current) {
-        socket.current.send(
-          JSON.stringify({
-            type: "ice-candidate",
-            candidate: event.candidate,
-          })
-        );
-      }
-    };
-
-    pc.ontrack = (event) => {
-      const audio = new Audio();
-      audio.srcObject = event.streams[0];
-      audio.autoplay = true;
-      audio.play().catch(() => {});
-    };
-
-    peerConnection.current = pc;
-
-    return pc;
+import React, { useEffect, useRef, useState } from "react";
+import { wsUrl } from "../chat/websocket";
+export default function Call({ room, token, onClose }) {
+  const [status, setStatus] = useState("Ready to join"),
+    [muted, setMuted] = useState(false),
+    [relay, setRelay] = useState(false);
+  const resources = useRef({}),
+    audio = useRef(null),
+    generation = useRef(0);
+  function cleanup() {
+    generation.current++;
+    const r = resources.current;
+    r.socket?.close();
+    r.pc?.close();
+    r.stream?.getTracks().forEach((t) => t.stop());
+    resources.current = {};
   }
-
-  async function startCall() {
-    if (calling) return;
-
-    localStream.current =
-      await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-
-    const pc = await createPeerConnection();
-
-    localStream.current.getTracks().forEach((track) => {
-      pc.addTrack(track, localStream.current);
-    });
-
-    socket.current = createSignalingConnection(
-      room,
-      handleSignalingMessage
-    );
-
-    socket.current.onopen = async () => {
-      const offer = await pc.createOffer();
-
-      await pc.setLocalDescription(offer);
-
-      socket.current.send(
-        JSON.stringify({
-          type: "offer",
-          sdp: offer.sdp,
-        })
-      );
-    };
-
-    setCalling(true);
-  }
-
-  async function handleSignalingMessage(message) {
-    if (message.type === "offer") {
-      if (calling) return;
-
-      localStream.current =
-        await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-
-      const pc = await createPeerConnection();
-
-      localStream.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStream.current);
-      });
-
-      await pc.setRemoteDescription({
-        type: "offer",
-        sdp: message.sdp,
-      });
-
-      const answer = await pc.createAnswer();
-
-      await pc.setLocalDescription(answer);
-
-      socket.current.send(
-        JSON.stringify({
-          type: "answer",
-          sdp: answer.sdp,
-        })
-      );
-
-      setCalling(true);
-    }
-
-    if (message.type === "answer") {
-      if (peerConnection.current) {
-        await peerConnection.current.setRemoteDescription({
-          type: "answer",
-          sdp: message.sdp,
-        });
+  useEffect(() => () => cleanup(), []);
+  async function join() {
+    cleanup();
+    const gen = generation.current;
+    setStatus("Requesting microphone");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (gen !== generation.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
       }
-    }
-
-    if (message.type === "ice-candidate") {
-      if (peerConnection.current) {
-        try {
-          await peerConnection.current.addIceCandidate(
-            message.candidate
+      resources.current.stream = stream;
+      const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+      if (import.meta.env.VITE_TURN_URL)
+        iceServers.push({
+          urls: import.meta.env.VITE_TURN_URL,
+          username: import.meta.env.VITE_TURN_USER,
+          credential: import.meta.env.VITE_TURN_PASSWORD,
+        });
+      if (relay && iceServers.length < 2)
+        throw Error("TURN is not configured. See the voice setup guide.");
+      const pc = new RTCPeerConnection({
+        iceServers,
+        iceTransportPolicy: relay ? "relay" : "all",
+      });
+      const socket = new WebSocket(
+        wsUrl(`/signal/ws/${room}?token=${encodeURIComponent(token)}`),
+      );
+      resources.current = { pc, socket, stream };
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      const pending = [];
+      pc.onicecandidate = (e) => {
+        if (e.candidate && socket.readyState === 1)
+          socket.send(
+            JSON.stringify({ type: "ice-candidate", candidate: e.candidate }),
           );
-        } catch (error) {
-          console.error(
-            "Failed to add ICE candidate:",
-            error
+      };
+      pc.ontrack = (e) => {
+        audio.current.srcObject = e.streams[0];
+        audio.current
+          .play()
+          .catch(() => setStatus("Tap the audio player to hear your peer"));
+      };
+      pc.onconnectionstatechange = () => {
+        if (gen === generation.current)
+          setStatus(
+            {
+              connected: "Voice connected",
+              failed: "Connection failed — leave and retry",
+              disconnected: "Peer connection interrupted",
+            }[pc.connectionState] || "Connecting voice",
           );
+      };
+      socket.onclose = () => {
+        if (gen === generation.current) {
+          cleanup();
+          setStatus("Voice disconnected — join again");
         }
-      }
+      };
+      let chain = Promise.resolve();
+      socket.onmessage = (e) => {
+        chain = chain
+          .then(async () => {
+            if (gen !== generation.current) return;
+            const m = JSON.parse(e.data);
+            if (m.type === "waiting") setStatus("Waiting for a second person");
+            if (m.type === "error") throw Error(m.message);
+            if (m.type === "peer-left") {
+              cleanup();
+              setStatus("Your peer left — join again");
+              return;
+            }
+            if (m.type === "peer-ready" && m.initiator) {
+              await pc.setLocalDescription(await pc.createOffer());
+              socket.send(
+                JSON.stringify({ type: "offer", sdp: pc.localDescription.sdp }),
+              );
+              setStatus("Connecting voice");
+            }
+            if (m.type === "offer" || m.type === "answer") {
+              await pc.setRemoteDescription({ type: m.type, sdp: m.sdp });
+              for (const candidate of pending.splice(0))
+                await pc.addIceCandidate(candidate);
+              if (m.type === "offer") {
+                await pc.setLocalDescription(await pc.createAnswer());
+                socket.send(
+                  JSON.stringify({
+                    type: "answer",
+                    sdp: pc.localDescription.sdp,
+                  }),
+                );
+              }
+            }
+            if (m.type === "ice-candidate") {
+              if (pc.remoteDescription) await pc.addIceCandidate(m.candidate);
+              else pending.push(m.candidate);
+            }
+          })
+          .catch((error) => {
+            if (gen !== generation.current) return;
+            cleanup();
+            setStatus(error.message);
+          });
+      };
+    } catch (error) {
+      cleanup();
+      setStatus(error.message || "Microphone unavailable");
     }
   }
-
-  function toggleMute() {
-    if (!localStream.current) return;
-
-    const audioTracks =
-      localStream.current.getAudioTracks();
-
-    audioTracks.forEach((track) => {
-      track.enabled = !track.enabled;
-    });
-
-    setMuted((current) => !current);
-  }
-
-  function leaveCall() {
-    // Stop microphone
-    if (localStream.current) {
-      localStream.current.getTracks().forEach((track) => {
-        track.stop();
-      });
-
-      localStream.current = null;
-    }
-
-    // Close WebRTC connection
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
-
-    // Close signaling connection
-    if (socket.current) {
-      socket.current.close();
-      socket.current = null;
-    }
-
-    setCalling(false);
-    setMuted(false);
-
-    if (onClose) {
-      onClose();
-    }
-  }
-
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-      }}
-    >
-      {!calling ? (
-        <button
-          onClick={startCall}
-          style={styles.startButton}
-        >
-          🎙 Start Voice Call
-        </button>
-      ) : (
+    <section className="call-panel" aria-label="Voice room">
+      <div>
+        <strong>
+          Voice lounge <span className="tag">1:1 AUDIO</span>
+        </strong>
+        <p role="status">{status}</p>
+      </div>
+      <audio ref={audio} autoPlay controls aria-label="Peer audio" />
+      {!resources.current.pc ? (
         <>
-          <div style={styles.callStatus}>
-            <span style={styles.greenDot} />
-            Voice connected
-          </div>
-
-          <button
-            onClick={toggleMute}
-            style={{
-              ...styles.controlButton,
-              background: muted
-                ? "rgba(255,98,98,.15)"
-                : "rgba(255,255,255,.05)",
-            }}
-          >
-            {muted ? "🔇 Unmute" : "🎙 Mute"}
-          </button>
-
-          <button
-            onClick={leaveCall}
-            style={styles.leaveButton}
-          >
-            📞 Leave
-          </button>
+          <label className="relay">
+            <input
+              type="checkbox"
+              checked={relay}
+              onChange={(e) => setRelay(e.target.checked)}
+            />
+            Force TURN
+          </label>
+          <button onClick={join}>Join voice</button>
         </>
+      ) : (
+        <button
+          onClick={() => {
+            resources.current.stream
+              .getAudioTracks()
+              .forEach((t) => (t.enabled = muted));
+            setMuted(!muted);
+          }}
+        >
+          {muted ? "Unmute" : "Mute"}
+        </button>
       )}
-    </div>
+      <button
+        className="subtle"
+        onClick={() => {
+          cleanup();
+          onClose();
+        }}
+      >
+        Leave
+      </button>
+    </section>
   );
 }
-
-const styles = {
-  startButton: {
-    border: "none",
-    borderRadius: "10px",
-    padding: "9px 14px",
-    background:
-      "linear-gradient(135deg,#8065ff,#4bbcff)",
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: "12px",
-    cursor: "pointer",
-  },
-
-  callStatus: {
-    display: "flex",
-    alignItems: "center",
-    gap: "7px",
-    color: "#54e58a",
-    fontSize: "11px",
-    fontWeight: "650",
-  },
-
-  greenDot: {
-    width: "7px",
-    height: "7px",
-    borderRadius: "50%",
-    background: "#54e58a",
-    boxShadow:
-      "0 0 8px rgba(84,229,138,.7)",
-  },
-
-  controlButton: {
-    border: "1px solid rgba(255,255,255,.06)",
-    borderRadius: "9px",
-    padding: "8px 12px",
-    color: "#d8dbea",
-    cursor: "pointer",
-    fontSize: "11px",
-  },
-
-  leaveButton: {
-    border: "none",
-    borderRadius: "9px",
-    padding: "8px 12px",
-    background: "rgba(255,98,98,.12)",
-    color: "#ff7777",
-    cursor: "pointer",
-    fontSize: "11px",
-    fontWeight: "650",
-  },
-};
-

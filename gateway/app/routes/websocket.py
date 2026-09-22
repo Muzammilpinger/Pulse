@@ -1,165 +1,129 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+import asyncio
+import logging
+import os
+import re
+import time
+import uuid
 
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from prometheus_client import Counter, Gauge, Histogram
+
+from app.auth import verify
 from app.connection_manager import ConnectionManager
 from app.database import AsyncSessionLocal
 from app.models import Message
 from app.pubsub import (
-    get_online_users,
+    leave,
     publish_message,
-    publish_presence,
-    set_user_offline,
-    set_user_online,
+    redis_client,
     subscribe_messages,
-    subscribe_presence,
+    touch,
+    users,
 )
 
-
 router = APIRouter()
-
 manager = ConnectionManager()
+log = logging.getLogger("pulse")
+ACTIVE = Gauge("pulse_connections", "Active WebSocket connections")
+MESSAGES = Counter("pulse_messages_total", "Persisted messages")
+ERRORS = Counter("pulse_errors_total", "Rejected messages and dependency errors")
+LATENCY = Histogram("pulse_persist_seconds", "Message persistence latency")
+ROOM_PATTERN = re.compile(r"^[a-z0-9-]{1,40}$")
 
-
-# ======================================================
-# REDIS MESSAGE LISTENER
-# ======================================================
 
 async def redis_listener():
-    print("🔵 Redis message listener started")
-
-    async for message in subscribe_messages():
-        try:
-            print("📨 Redis received:", message)
-
-            room_id = message["room_id"]
-
-            await manager.broadcast_to_room(
-                room_id,
-                {
-                    "type": "message",
-                    "room_id": room_id,
-                    "sender_id": message["sender_id"],
-                    "content": message["content"],
-                },
-            )
-
-            print(
-                "📡 Message broadcasted to room:",
-                room_id,
-            )
-
-        except Exception as error:
-            print(
-                f"❌ Redis message listener error: {error}"
-            )
+    async for event in subscribe_messages():
+        await manager.broadcast_to_room(event["room_id"], event)
 
 
-# ======================================================
-# REDIS PRESENCE LISTENER
-# ======================================================
+async def heartbeat(websocket, room, cid, user):
+    while True:
+        await touch(room, cid, user)
+        await websocket.send_json({"type": "presence_list", "users": await users(room)})
+        await asyncio.sleep(10)
 
-async def presence_listener():
-    print("🟢 Redis presence listener started")
-
-    async for event in subscribe_presence():
-        try:
-            print("👤 Presence event:", event)
-
-            user_id = event["user_id"]
-            status = event["status"]
-
-            await manager.broadcast_to_all(
-                {
-                    "type": "presence",
-                    "user_id": user_id,
-                    "status": status,
-                }
-            )
-
-        except Exception as error:
-            print(
-                f"❌ Redis presence listener error: {error}"
-            )
-
-
-# ======================================================
-# WEBSOCKET
-# ======================================================
 
 @router.websocket("/ws")
 async def websocket_endpoint(
-    websocket: WebSocket,
-    room: str = "general",
-    user: str = "anonymous",
+    websocket: WebSocket, room: str = "general", token: str = ""
 ):
-    await manager.connect(
-        websocket,
-        room,
-    )
-
-    print(
-        f"🟢 {user} joined #{room}"
-    )
-
-    # Add user to Redis presence
-    await set_user_online(user)
-
-    # Send current online users to this browser
-    online_users = await get_online_users()
-
-    await websocket.send_json(
-        {
-            "type": "presence_list",
-            "users": list(online_users),
-        }
-    )
-
-    # Tell everyone else that this user joined
-    await publish_presence(
-        user,
-        "online",
-    )
-
     try:
+        user = verify(token)
+    except HTTPException:
+        await websocket.close(code=4401)
+        return
+    origin = websocket.headers.get("origin")
+    allowed = os.getenv(
+        "ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8085"
+    ).split(",")
+    if not ROOM_PATTERN.fullmatch(room) or (origin and origin not in allowed):
+        await websocket.close(code=4403)
+        return
+    cid = uuid.uuid4().hex
+    await manager.connect(websocket, room)
+    ACTIVE.inc()
+    task = None
+    try:
+        await touch(room, cid, user)
+        await websocket.send_json(
+            {"type": "ready", "instance": os.getenv("HOSTNAME", "local"), "user": user}
+        )
+        task = asyncio.create_task(heartbeat(websocket, room, cid, user))
         while True:
             content = await websocket.receive_text()
-
-            print(
-                f"💬 {user} -> #{room}: {content}"
-            )
-
-            message = Message(
-                room_id=room,
-                sender_id=user,
-                content=content,
-            )
-
-            async with AsyncSessionLocal() as session:
-                session.add(message)
-                await session.commit()
-
+            if not content.strip() or len(content) > 4000:
+                ERRORS.inc()
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "message": "Messages must contain 1–4000 characters.",
+                    }
+                )
+                continue
+            key = f"pulse:rate:{user}:{int(time.time() // 10)}"
+            count = await redis_client.incr(key)
+            await redis_client.expire(key, 20)
+            if count > 20:
+                ERRORS.inc()
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "message": "Slow down: 20 messages per 10 seconds.",
+                    }
+                )
+                continue
+            message = Message(room_id=room, sender_id=user, content=content.strip())
+            with LATENCY.time():
+                async with AsyncSessionLocal() as session:
+                    session.add(message)
+                    await session.commit()
+            MESSAGES.inc()
             await publish_message(
                 {
+                    "type": "message",
+                    "id": message.id,
                     "room_id": room,
                     "sender_id": user,
-                    "content": content,
+                    "content": message.content,
+                    "created_at": message.created_at.isoformat() + "Z",
                 }
             )
-
     except WebSocketDisconnect:
-        manager.disconnect(
-            websocket,
-            room,
-        )
-
-        # Remove user from Redis presence
-        await set_user_offline(user)
-
-        # Tell everyone that they left
-        await publish_presence(
-            user,
-            "offline",
-        )
-
-        print(
-            f"🔴 {user} left #{room}"
-        )
+        pass
+    except Exception:
+        ERRORS.inc()
+        log.exception("websocket_dependency_failure")
+        try:
+            await websocket.close(code=1013)
+        except Exception:
+            pass
+    finally:
+        if task:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        manager.disconnect(websocket, room)
+        ACTIVE.dec()
+        try:
+            await leave(room, cid, user)
+        except Exception:
+            log.warning("presence_cleanup_deferred_to_expiry")

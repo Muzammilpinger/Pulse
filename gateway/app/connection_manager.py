@@ -1,73 +1,37 @@
-import json
-
-from fastapi import WebSocket
+import asyncio
 
 
 class ConnectionManager:
     def __init__(self):
-        self.rooms: dict[str, set[WebSocket]] = {}
+        self.rooms = {}
 
-    async def connect(
-        self,
-        websocket: WebSocket,
-        room_id: str,
-    ):
+    async def connect(self, websocket, room):
         await websocket.accept()
+        self.rooms.setdefault(room, set()).add(websocket)
 
-        if room_id not in self.rooms:
-            self.rooms[room_id] = set()
+    def disconnect(self, websocket, room):
+        connections = self.rooms.get(room, set())
+        connections.discard(websocket)
+        if not connections:
+            self.rooms.pop(room, None)
 
-        self.rooms[room_id].add(websocket)
-
-    def disconnect(
-        self,
-        websocket: WebSocket,
-        room_id: str,
-    ):
-        if room_id not in self.rooms:
-            return
-
-        self.rooms[room_id].discard(websocket)
-
-        if not self.rooms[room_id]:
-            del self.rooms[room_id]
-
-    async def send_personal_message(
-        self,
-        message: str,
-        websocket: WebSocket,
-    ):
-        await websocket.send_text(message)
-
-    async def broadcast_to_room(
-        self,
-        room_id: str,
-        message: dict,
-    ):
-        connections = self.rooms.get(room_id, set())
-        disconnected = set()
-
-        for connection in connections:
+    async def broadcast_to_room(self, room, message):
+        async def send(connection):
             try:
-                await connection.send_text(
-                    json.dumps(message)
-                )
-            except Exception as error:
-                print(
-                    f"❌ Failed to send to WebSocket: {error}"
-                )
-                disconnected.add(connection)
+                await asyncio.wait_for(connection.send_json(message), timeout=3)
+            except Exception:
+                self.disconnect(connection, room)
+                try:
+                    await connection.close(code=1013)
+                except Exception:
+                    pass
 
-        for connection in disconnected:
-            self.disconnect(connection, room_id)
+        await asyncio.gather(*(send(c) for c in tuple(self.rooms.get(room, ()))))
 
-    async def broadcast_to_all(
-        self,
-        message: dict,
-    ):
-        for room_id in list(self.rooms.keys()):
-            await self.broadcast_to_room(
-                room_id,
-                message,
-            )
-
+    async def close(self):
+        for room, connections in tuple(self.rooms.items()):
+            for connection in tuple(connections):
+                try:
+                    await connection.close(code=1012)
+                except Exception:
+                    pass

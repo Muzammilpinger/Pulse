@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://pulse:pulse@localhost:5432/pulse",
@@ -17,6 +16,7 @@ DATABASE_URL = os.getenv(
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
+    pool_pre_ping=True,
 )
 
 

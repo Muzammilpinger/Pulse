@@ -1,7 +1,8 @@
-fastapi
-uvicorn[standard]
-websockets
-redis
-asyncpg
-sqlalchemy
-pydantic-settings
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+websockets==15.0.1
+redis==8.1.0
+asyncpg==0.31.0
+sqlalchemy==2.0.54
+prometheus-client==0.26.0
+PyJWT==2.14.0

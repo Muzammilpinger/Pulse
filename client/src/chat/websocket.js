@@ -1,60 +1,49 @@
-export function connectWebSocket(
-  roomId,
-  userId,
-  onMessage,
-  onStatus,
-  onPresence
-) {
-  const socket = new WebSocket(
-    `ws://127.0.0.1:8001/ws?room=${encodeURIComponent(
-      roomId
-    )}&user=${encodeURIComponent(userId)}`
-  );
-
-  socket.onopen = () => {
-    console.log("🟢 Connected to Pulse");
-    onStatus("online");
-  };
-
-  socket.onmessage = (event) => {
-    try {
+export const wsUrl = (path) =>
+  `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${path}`;
+export function connectWebSocket(room, token, onEvent, onStatus, onReady) {
+  let socket,
+    timer,
+    stopped = false,
+    attempt = 0;
+  function connect() {
+    onStatus(attempt ? "Reconnecting" : "Connecting");
+    socket = new WebSocket(
+      wsUrl(
+        `/api/ws?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`,
+      ),
+    );
+    socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-
-      console.log("🔥 WebSocket received:", data);
-
-      if (data.type === "message") {
-        onMessage(data);
+      if (data.type === "ready") {
+        attempt = 0;
+        onStatus("Connected");
+        onReady(data);
+      } else onEvent(data);
+    };
+    socket.onclose = (event) => {
+      if (stopped) return;
+      if ([4401, 4403, 1008].includes(event.code)) {
+        onStatus("Session expired");
         return;
       }
-
-      if (data.type === "presence") {
-        onPresence(data);
-        return;
-      }
-
-      if (data.type === "presence_list") {
-        onPresence({
-          type: "presence_list",
-          users: data.users,
-        });
-      }
-    } catch (error) {
-      console.error(
-        "Failed to parse WebSocket message:",
-        error
+      onStatus("Reconnecting");
+      timer = setTimeout(
+        connect,
+        Math.min(1000 * 2 ** attempt++, 10000) + Math.random() * 400,
       );
-    }
+    };
+  }
+  connect();
+  return {
+    send: (text) => {
+      if (socket.readyState !== WebSocket.OPEN) return false;
+      socket.send(text);
+      return true;
+    },
+    close: () => {
+      stopped = true;
+      clearTimeout(timer);
+      socket?.close();
+    },
   };
-
-  socket.onclose = () => {
-    console.log("🔴 Disconnected from Pulse");
-    onStatus("offline");
-  };
-
-  socket.onerror = (error) => {
-    console.error("WebSocket error:", error);
-    onStatus("offline");
-  };
-
-  return socket;
 }

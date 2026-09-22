@@ -1,71 +1,49 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import router as auth_router
 from app.database import Base, engine
-
+from app.pubsub import redis_client, subscriber_client
 from app.routes.health import router as health_router
 from app.routes.messages import router as messages_router
-from app.routes.websocket import (
-    router as websocket_router,
-    redis_listener,
-    presence_listener,
+from app.routes.websocket import manager, redis_listener
+from app.routes.websocket import router as websocket_router
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
 )
-
-
-redis_task = None
-presence_task = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    global redis_task
-    global presence_task
+async def lifespan(app):
+    # Replicas can start before PostgreSQL is ready; retry within the startup probe window.
+    from sqlalchemy import text
 
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-
-    redis_task = asyncio.create_task(redis_listener())
-    presence_task = asyncio.create_task(presence_listener())
-
+    for attempt in range(30):
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(text("SELECT pg_advisory_xact_lock(741852)"))
+                await connection.run_sync(Base.metadata.create_all)
+            break
+        except Exception:
+            if attempt == 29:
+                raise
+            await asyncio.sleep(2)
+    task = asyncio.create_task(redis_listener())
     yield
-
-    redis_task.cancel()
-    presence_task.cancel()
-
-    try:
-        await redis_task
-    except asyncio.CancelledError:
-        pass
-
-    try:
-        await presence_task
-    except asyncio.CancelledError:
-        pass
-
+    await manager.close()
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    await redis_client.aclose()
+    await subscriber_client.aclose()
     await engine.dispose()
 
 
-app = FastAPI(
-    title="Pulse Gateway",
-    version="0.1.0",
-    lifespan=lifespan,
-)
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
+app = FastAPI(title="Pulse Gateway", version="0.5.0", lifespan=lifespan)
+app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(messages_router)
 app.include_router(websocket_router)

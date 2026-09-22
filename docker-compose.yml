@@ -1,63 +1,61 @@
+name: pulse
+x-gateway: &gateway
+  build: ./gateway
+  environment: &gateway-env
+    DATABASE_URL: postgresql+asyncpg://pulse:pulse@postgres:5432/pulse
+    REDIS_URL: redis://redis:6379
+    SESSION_SECRET: ${SESSION_SECRET:-local-demo-only-change-this-secret-32-characters}
+    ALLOWED_ORIGINS: http://localhost:8085,http://localhost:5173,http://127.0.0.1:5173
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8001/ready')"]
+    interval: 5s
+    timeout: 4s
+    retries: 15
 services:
-
   postgres:
-    image: postgres:17
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: pulse
       POSTGRES_PASSWORD: pulse
       POSTGRES_DB: pulse
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    volumes: [postgres_data:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
+      test: [CMD-SHELL, pg_isready -U pulse -d pulse]
+      interval: 3s
+      timeout: 3s
+      retries: 15
   redis:
-    image: redis:8
-    ports:
-      - "6379:6379"
+    image: redis:8-alpine
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 15
   gateway:
-    build:
-      context: ./gateway
-    ports:
-      - "8001:8001"
+    <<: *gateway
+    ports: ["127.0.0.1:8001:8001"]
+  gateway-2:
+    <<: *gateway
+    ports: ["127.0.0.1:8011:8001"]
+  signaling:
+    build: ./signaling
     environment:
-      DATABASE_URL: postgresql+asyncpg://pulse:pulse@postgres:5432/pulse
-      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:-local-demo-only-change-this-secret-32-characters}
+      ALLOWED_ORIGINS: http://localhost:8085,http://localhost:5173,http://127.0.0.1:5173
+    ports: ["127.0.0.1:8002:8002"]
+  client:
+    build: ./client
+    ports: ["127.0.0.1:8085:8080"]
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
+      gateway: {condition: service_healthy}
+      signaling: {condition: service_started}
   coturn:
-    image: coturn/coturn:latest
-    command:
-      - turnserver
-      - --no-cli
-      - --no-tls
-      - --no-dtls
-      - --fingerprint
-      - --lt-cred-mech
-      - --realm=pulse.local
-      - --user=pulse:pulse
-      - --listening-port=3478
-      - --min-port=49152
-      - --max-port=49252
-    ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "49152-49252:49152-49252/udp"
-
+    image: coturn/coturn:4.6.3
+    profiles: [voice]
+    command: ["-n", "--no-cli", "--no-tls", "--no-dtls", "--fingerprint", "--lt-cred-mech", "--realm=pulse.local", "--user=pulse:pulse", "--listening-port=3478", "--min-port=49160", "--max-port=49170"]
+    ports: ["127.0.0.1:3478:3478/tcp", "127.0.0.1:3478:3478/udp", "127.0.0.1:49160-49170:49160-49170/udp"]
 volumes:
   postgres_data:

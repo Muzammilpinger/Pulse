@@ -1,109 +1,62 @@
+import asyncio
 import json
+import logging
 import os
+import time
 
 import redis.asyncio as redis
 
-
-REDIS_URL = os.getenv(
-    "REDIS_URL",
-    "redis://localhost:6379",
-)
-
-MESSAGE_CHANNEL = "pulse:messages"
-PRESENCE_CHANNEL = "pulse:presence"
-PRESENCE_KEY = "pulse:presence"
-
 redis_client = redis.from_url(
-    REDIS_URL,
+    os.getenv("REDIS_URL", "redis://localhost:6379"),
     decode_responses=True,
+    socket_connect_timeout=3,
+    socket_timeout=5,
 )
+subscriber_client = redis.from_url(
+    os.getenv("REDIS_URL", "redis://localhost:6379"),
+    decode_responses=True,
+    socket_connect_timeout=3,
+    health_check_interval=10,
+)
+subscription_ready = asyncio.Event()
+log = logging.getLogger("pulse")
 
 
-# ======================================================
-# MESSAGES
-# ======================================================
-
-async def publish_message(message: dict):
-    await redis_client.publish(
-        MESSAGE_CHANNEL,
-        json.dumps(message),
-    )
+async def publish_message(message):
+    await redis_client.publish("pulse:events", json.dumps(message))
 
 
 async def subscribe_messages():
-    pubsub = redis_client.pubsub()
-
-    await pubsub.subscribe(MESSAGE_CHANNEL)
-
-    try:
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                yield json.loads(message["data"])
-
-    finally:
-        await pubsub.unsubscribe(MESSAGE_CHANNEL)
-        await pubsub.close()
-
-
-# ======================================================
-# PRESENCE STATE
-# ======================================================
-
-async def set_user_online(user_id: str):
-    await redis_client.sadd(
-        PRESENCE_KEY,
-        user_id,
-    )
+    while True:
+        try:
+            async with subscriber_client.pubsub() as pubsub:
+                await pubsub.subscribe("pulse:events")
+                async for event in pubsub.listen():
+                    if event["type"] == "subscribe":
+                        subscription_ready.set()
+                    if event["type"] == "message":
+                        yield json.loads(event["data"])
+        except (redis.RedisError, OSError):
+            subscription_ready.clear()
+            log.warning("pubsub_reconnecting")
+            await asyncio.sleep(1)
 
 
-async def set_user_offline(user_id: str):
-    await redis_client.srem(
-        PRESENCE_KEY,
-        user_id,
-    )
+async def touch(room, connection_id, user):
+    key = f"pulse:presence:{room}"
+    member = f"{user}:{connection_id}"
+    async with redis_client.pipeline(transaction=True) as pipe:
+        pipe.zadd(key, {member: time.time() + 35})
+        pipe.expire(key, 70)
+        await pipe.execute()
 
 
-async def get_online_users():
-    return await redis_client.smembers(
-        PRESENCE_KEY
-    )
+async def leave(room, connection_id, user):
+    await redis_client.zrem(f"pulse:presence:{room}", f"{user}:{connection_id}")
 
 
-# ======================================================
-# PRESENCE EVENTS
-# ======================================================
-
-async def publish_presence(
-    user_id: str,
-    status: str,
-):
-    await redis_client.publish(
-        PRESENCE_CHANNEL,
-        json.dumps(
-            {
-                "user_id": user_id,
-                "status": status,
-            }
-        ),
-    )
-
-
-async def subscribe_presence():
-    pubsub = redis_client.pubsub()
-
-    await pubsub.subscribe(
-        PRESENCE_CHANNEL
-    )
-
-    try:
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                yield json.loads(
-                    message["data"]
-                )
-
-    finally:
-        await pubsub.unsubscribe(
-            PRESENCE_CHANNEL
-        )
-        await pubsub.close()
+async def users(room):
+    key = f"pulse:presence:{room}"
+    await redis_client.zremrangebyscore(key, "-inf", time.time())
+    members = await redis_client.zrange(key, 0, -1)
+    return sorted({member.split(":", 1)[0] for member in members})
