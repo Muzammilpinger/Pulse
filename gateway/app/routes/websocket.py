@@ -7,6 +7,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from prometheus_client import Counter, Gauge, Histogram
+from redis.exceptions import RedisError
 
 from app.auth import verify
 from app.connection_manager import ConnectionManager
@@ -38,24 +39,23 @@ async def redis_listener():
 
 async def heartbeat(websocket, room, cid, user):
     while True:
-        await touch(room, cid, user)
-        await websocket.send_json({"type": "presence_list", "users": await users(room)})
+        try:
+            await touch(room, cid, user)
+            await websocket.send_json({"type": "presence_list", "users": await users(room)})
+        except RedisError:
+            log.warning("presence_refresh_waiting_for_redis")
         await asyncio.sleep(10)
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(
-    websocket: WebSocket, room: str = "general", token: str = ""
-):
+async def websocket_endpoint(websocket: WebSocket, room: str = "general", token: str = ""):
     try:
         user = verify(token)
     except HTTPException:
         await websocket.close(code=4401)
         return
     origin = websocket.headers.get("origin")
-    allowed = os.getenv(
-        "ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8085"
-    ).split(",")
+    allowed = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8085").split(",")
     if not ROOM_PATTERN.fullmatch(room) or (origin and origin not in allowed):
         await websocket.close(code=4403)
         return

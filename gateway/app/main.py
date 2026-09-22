@@ -12,9 +12,7 @@ from app.routes.messages import router as messages_router
 from app.routes.websocket import manager, redis_listener
 from app.routes.websocket import router as websocket_router
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 @asynccontextmanager

@@ -22,9 +22,7 @@ async def health():
 @app.websocket("/ws/{room}")
 async def signaling(websocket: WebSocket, room: str, token: str = ""):
     try:
-        jwt.decode(
-            token, SECRET, algorithms=["HS256"], options={"require": ["exp", "sub"]}
-        )
+        jwt.decode(token, SECRET, algorithms=["HS256"], options={"require": ["exp", "sub"]})
     except jwt.InvalidTokenError:
         await websocket.close(code=4401)
         return
@@ -32,9 +30,9 @@ async def signaling(websocket: WebSocket, room: str, token: str = ""):
     if not re.fullmatch(r"[a-z0-9-]{1,40}", room) or (
         origin
         and origin
-        not in os.getenv(
-            "ALLOWED_ORIGINS", "http://localhost:8085,http://localhost:5173"
-        ).split(",")
+        not in os.getenv("ALLOWED_ORIGINS", "http://localhost:8085,http://localhost:5173").split(
+            ","
+        )
     ):
         await websocket.close(code=4403)
         return
@@ -52,9 +50,7 @@ async def signaling(websocket: WebSocket, room: str, token: str = ""):
         await websocket.send_json({"type": "waiting"})
         if existing_peers:
             for peer in tuple(peers):
-                await peer.send_json(
-                    {"type": "peer-ready", "initiator": peer != websocket}
-                )
+                await peer.send_json({"type": "peer-ready", "initiator": peer != websocket})
         while True:
             raw = await websocket.receive_text()
             if len(raw) > 16000:

@@ -30,9 +30,9 @@ async def session(guest: Guest):
 
 def verify(token: str) -> str:
     try:
-        return jwt.decode(
-            token, SECRET, algorithms=["HS256"], options={"require": ["exp", "sub"]}
-        )["sub"]
+        return jwt.decode(token, SECRET, algorithms=["HS256"], options={"require": ["exp", "sub"]})[
+            "sub"
+        ]
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Session expired. Please join again.")
 
