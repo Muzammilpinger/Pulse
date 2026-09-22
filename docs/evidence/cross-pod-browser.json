@@ -1,0 +1,7 @@
+{
+  "date": "2026-09-22T22:18:47.529Z",
+  "senderPod": "gateway-c7d8b8b58-6cvvd",
+  "receiverPod": "gateway-c7d8b8b58-jrslr",
+  "message": "Verified across two different gateway pods · 2026-09-22T22:18:45.297Z",
+  "received": true
+}

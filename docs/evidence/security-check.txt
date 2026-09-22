@@ -1,3 +1,5 @@
+deployment "gateway" successfully rolled out
+deployment "signaling" successfully rolled out
 gateway -> redis: 0
 signaling -> redis: 11
 no
