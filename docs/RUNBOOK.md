@@ -69,3 +69,15 @@ The ArgoCD Application in `deploy/argocd/application.yaml` uses this repository 
 ## Shutdown and retention
 
 `docker compose stop` preserves history. `docker compose down` also preserves the named data volume. `docker compose down -v` destroys local demo history; use it only intentionally. PostgreSQL data in the kind cluster disappears when that cluster is deleted. Export anything worth retaining before cleanup.
+
+## Optional local delivery lab
+
+After `cluster-up.sh`, run `scripts/addons-up.sh` with Helm and kubectl installed. This installs the pinned local ingress, GitOps, admission, metrics and encryption controllers. Install kubeseal 0.40.0, then run `python3 scripts/seal-demo-secret.py` (or set `KUBESEAL` to its executable). It seals the already-provisioned demo Secret in memory, applies the SealedSecret, and checks decrypted equality without writing plaintext credentials. Keep the controller encryption key out of Git and back it up separately if retaining encrypted manifests.
+
+Apply `deploy/argocd/application.yaml`; review the immutable images in `values-gitops.yaml`, then sync in Argo CD. The example uses manual reconciliation and no automated prune. Once Argo manages the release, update desired state through Git rather than also performing Helm upgrades against it. Restore a bad live rollout by syncing the known-good Git revision; `scripts/verify-gitops.py` demonstrates this in the dedicated demo cluster.
+
+Forward `svc/traefik` in `ingress-system` to `8089:80` for ingress and `svc/argocd-server` in `argocd` to `8090:443` for the local Argo UI. Its initial admin password comes from `argocd-initial-admin-secret`; do not commit or screenshot it. Traefik uses a ClusterIP Service and reports loopback as the local ingress endpoint. This is not public ingress or TLS provisioning.
+
+After restarting Docker Desktop, kind node IPs may change. Inspect node addresses and kube-system readiness before blaming application code. In this test environment, restarting the dedicated cluster's kube-proxy/kindnet/CoreDNS restored networking; one earlier control-plane kubelet endpoint also required correction. Do not apply those repairs to another cluster blindly. Port-forward processes must be restarted if their selected pods are replaced.
+
+`verify-alerts.py`, `verify-voice-failures.cjs`, and `verify-node-drain.py` deliberately interrupt the dedicated demo. Each restores what it stopped. Run them separately from ordinary regression tests. `verify-fresh-setup.py` builds an isolated project with new data, tests it, and removes only that temporary project's volumes.

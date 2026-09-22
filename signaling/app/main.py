@@ -5,10 +5,12 @@ import os
 import re
 
 import jwt
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
 app = FastAPI(title="Pulse Signaling")
 connections = {}
+CALL_RESULTS = Counter("pulse_voice_peer_results", "Untrusted browser-reported peer connection outcomes", ["outcome"])
 SECRET = os.environ.get("SESSION_SECRET", "")
 if len(SECRET) < 32:
     raise RuntimeError("SESSION_SECRET must contain at least 32 characters")
@@ -17,6 +19,11 @@ if len(SECRET) < 32:
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.websocket("/ws/{room}")
@@ -44,6 +51,7 @@ async def signaling(websocket: WebSocket, room: str, token: str = ""):
         )
         await websocket.close(code=4409)
         return
+    reported = set()
     existing_peers = tuple(peers)
     peers.add(websocket)
     try:
@@ -62,12 +70,19 @@ async def signaling(websocket: WebSocket, room: str, token: str = ""):
                     "offer",
                     "answer",
                     "ice-candidate",
+                    "peer-state",
                 }:
                     raise ValueError()
             except (ValueError, TypeError):
                 await websocket.send_json(
                     {"type": "error", "message": "Invalid signaling message."}
                 )
+                continue
+            if message["type"] == "peer-state":
+                outcome = message.get("state")
+                if outcome in {"connected", "failed"} and outcome not in reported:
+                    CALL_RESULTS.labels(outcome).inc()
+                    reported.add(outcome)
                 continue
             for peer in tuple(peers):
                 if peer != websocket:

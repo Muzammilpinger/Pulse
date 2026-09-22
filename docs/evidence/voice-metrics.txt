@@ -1,0 +1,2 @@
+pulse_voice_peer_results_total{outcome="connected"} 2.0
+pulse_voice_peer_results_created{outcome="connected"} 1.7901148798145604e+09

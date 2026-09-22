@@ -5,8 +5,10 @@
 
 Running 3 tests using 1 worker
 
-  ✓  1 tests/workspace.spec.js:8:5 › two guests exchange persisted messages, switch channels, and search (5.6s)
-  ✓  2 tests/workspace.spec.js:35:5 › mobile layout, keyboard send, safe text rendering, and logout (3.6s)
-  ✓  3 tests/workspace.spec.js:56:5 › two browsers establish WebRTC audio and cleanly leave (5.2s)
+(node:5922) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/workspace.spec.js:8:5 › two guests exchange persisted messages, switch channels, and search (6.1s)
+  ✓  2 tests/workspace.spec.js:35:5 › mobile layout, keyboard send, safe text rendering, and logout (4.0s)
+  ✓  3 tests/workspace.spec.js:56:5 › two browsers establish WebRTC audio and cleanly leave (5.8s)
 
-  3 passed (14.9s)
+  3 passed (16.3s)

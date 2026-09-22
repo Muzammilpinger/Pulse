@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-22T22:07:23.789Z",
+  "scope": "Local Chromium synthetic microphones; forced relay. No external NAT or audio-quality claim.",
+  "turn": {
+    "secondsUntilLoss": 2.177,
+    "state": "failed",
+    "ui": "Connection failed — leave and retry",
+    "rejoined": true
+  },
+  "signaling": {
+    "state": "closed",
+    "ui": "Voice disconnected — join again"
+  }
+}

@@ -179,6 +179,34 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 7,
+      "title": "Voice peer outcomes \u00b7 browser reported",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pulse-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "pulse_voice_peer_results_total",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
     }
   ]
 }

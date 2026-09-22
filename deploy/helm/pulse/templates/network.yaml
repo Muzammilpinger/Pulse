@@ -72,6 +72,8 @@ spec:
     - from:
         - podSelector:
             matchLabels: {app: client}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
       ports: [{port: 8002, protocol: TCP}]
 {{- range $name, $port := dict "postgres" 5432 "redis" 6379 }}
 ---

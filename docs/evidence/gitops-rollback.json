@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-22T22:03:22.475681+00:00",
+  "initialRevision": "d87fab961eb54cca01ee355693098348ddbc9cc0",
+  "initial": "Synced / Healthy",
+  "failedRolloutStates": [
+    null,
+    null,
+    "ErrImagePull"
+  ],
+  "readyReplicasDuringFailure": 2,
+  "restored": "Synced / Healthy",
+  "restoredRevision": "d87fab961eb54cca01ee355693098348ddbc9cc0",
+  "images": {
+    "client": "ghcr.io/muzammilpinger/pulse-client:6e46825beb747340b5d807f9f04b222a16334d55",
+    "gateway": "ghcr.io/muzammilpinger/pulse-gateway:6e46825beb747340b5d807f9f04b222a16334d55",
+    "redis": "redis:8-alpine",
+    "signaling": "ghcr.io/muzammilpinger/pulse-signaling:6e46825beb747340b5d807f9f04b222a16334d55"
+  },
+  "scope": "Manual Argo sync; injected live image drift rejected by pull, then restored from the same known-good Git revision. Not an automatic rollback."
+}

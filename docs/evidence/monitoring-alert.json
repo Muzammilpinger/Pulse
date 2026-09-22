@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-22T22:03:05.712019+00:00",
+  "outage": {
+    "seconds": 72.2,
+    "alerts": [
+      {
+        "labels": {
+          "alertname": "PulseGatewayUnavailable",
+          "severity": "critical"
+        },
+        "annotations": {
+          "summary": "No gateway is reachable"
+        },
+        "state": "firing",
+        "activeAt": "2026-09-22T22:03:17.796349549Z",
+        "value": "0e+00"
+      }
+    ]
+  },
+  "restored": {
+    "seconds": 6.02,
+    "alerts": []
+  }
+}

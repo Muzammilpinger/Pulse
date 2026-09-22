@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-22T22:04:10.617331+00:00",
+  "node": "pulse-demo-worker",
+  "postgresNodeExcluded": "pulse-demo-worker2",
+  "exitCode": 0,
+  "output": "node/pulse-demo-worker cordoned\nWarning: ignoring DaemonSet-managed Pods: kube-system/kindnet-66tfn, kube-system/kube-proxy-t6sjr\nevicting pod argocd/argocd-applicationset-controller-798656677d-phzbb\nevicting pod ingress-system/traefik-9c94f8fc7-69b6l\nevicting pod pulse/gateway-64779586b4-ddm59\nevicting pod pulse/client-6c95964bdf-r9gsp\nevicting pod kube-system/coredns-5695dd8b74-8h5gw\nevicting pod argocd/argocd-repo-server-7db54958bd-xs246\nevicting pod pulse/redis-b5f7b6884-rv9k9\nevicting pod kyverno/kyverno-cleanup-controller-6568b5c899-hgrhg\nevicting pod argocd/argocd-notifications-controller-74479b6dd6-fnv6q\nevicting pod pulse/signaling-c65dc8d4d-fz28g\npod/redis-b5f7b6884-rv9k9 evicted\npod/argocd-notifications-controller-74479b6dd6-fnv6q evicted\npod/argocd-applicationset-controller-798656677d-phzbb evicted\npod/kyverno-cleanup-controller-6568b5c899-hgrhg evicted\npod/argocd-repo-server-7db54958bd-xs246 evicted\nI0923 03:04:12.849086    5496 request.go:752] \"Waited before sending request\" delay=\"1.106464917s\" reason=\"client-side throttling, not priority and fairness\" verb=\"GET\" URL=\"https://127.0.0.1:51111/api/v1/namespaces/pulse/pods/gateway-64779586b4-ddm59\"\npod/traefik-9c94f8fc7-69b6l evicted\npod/signaling-c65dc8d4d-fz28g evicted\npod/coredns-5695dd8b74-8h5gw evicted\npod/client-6c95964bdf-r9gsp evicted\npod/gateway-64779586b4-ddm59 evicted\nnode/pulse-demo-worker drained\n",
+  "seconds": 6.64,
+  "readyGateways": 2,
+  "scope": "Voluntary local worker drain with eviction/PDB enforcement. PostgreSQL local-volume node excluded. Not an abrupt node-loss or database-HA test."
+}

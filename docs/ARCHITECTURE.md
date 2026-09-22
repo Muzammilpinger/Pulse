@@ -48,3 +48,5 @@ Prometheus measures connections, persisted messages, errors, and persistence dur
 - [Kubernetes network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/): policy resources require an enforcing network plugin.
 - [Prometheus histograms](https://prometheus.io/docs/practices/histograms/): latency panels use histogram bucket rates and `histogram_quantile`.
 - [FastAPI release notes](https://fastapi.tiangolo.com/release-notes/): backend dependencies are pinned to explicit releases.
+
+Voice outcome counters record `connected` and `failed` reports from each browser peer, at most once per outcome per signaling connection. They are low-cardinality, untrusted client telemetry, not a count of unique calls or a server-side proof of media quality. They reset when signaling restarts.
