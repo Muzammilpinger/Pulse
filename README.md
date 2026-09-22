@@ -1,357 +1,149 @@
-# Pulse
+<p align="center"><img src="docs/images/banner.svg" alt="Pulse — conversations, connected" width="100%"></p>
 
-> A real-time communication platform built from scratch with WebSockets, FastAPI, Redis, PostgreSQL, and React.
+<p align="center">
+  <a href="https://github.com/Muzammilpinger/Pulse/actions/workflows/ci.yml"><img src="https://github.com/Muzammilpinger/Pulse/actions/workflows/ci.yml/badge.svg" alt="Verify Pulse"></a>
+  <a href="https://github.com/Muzammilpinger/Pulse/releases"><img src="https://img.shields.io/github/v/release/Muzammilpinger/Pulse?color=627d68" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/React_%2B_FastAPI-627d68" alt="React and FastAPI">
+</p>
 
-Pulse is a real-time chat system designed to explore how modern communication infrastructure works under the hood.
+<p align="center"><strong>A calm place to talk. A distributed system you can inspect.</strong><br>
+Public channels, durable chat, shared presence, and two-person voice — with measured failure recovery and a working delivery pipeline.</p>
 
-Instead of relying on a third-party realtime service, Pulse implements its own WebSocket communication layer, Redis Pub/Sub messaging pipeline, presence system, persistent message history, and React client.
+<p align="center"><a href="#run-it">Run it</a> · <a href="docs/CASE_STUDY.md">Engineering story</a> · <a href="docs/LOAD_TEST_RESULTS.md">Measurements</a> · <a href="docs/DEMO.md">Walkthrough</a> · <a href="docs/RUNBOOK.md">Operations</a></p>
 
-## V1
+![Pulse workspace, captured from the running app](docs/images/workspace.png)
 
-**Pulse V1 is a functional real-time chat platform.**
+## The thirty-second version
 
-### Features
+Pulse explores what happens after a chat app grows beyond one server. Browsers can connect to different FastAPI gateways and still share a conversation. PostgreSQL stores history; Redis distributes live events and maintains expiring presence. React reconnects, merges history, and offers a separate WebRTC voice lounge.
 
-* Real-time messaging with WebSockets
-* Multiple users and chat rooms
-* Persistent message history
-* Redis Pub/Sub message distribution
-* Online/offline presence
-* Automatic message scrolling
-* Realtime connection status
-* React-based interface
-* FastAPI backend
-* PostgreSQL persistence
-* Docker support
-* Basic automated testing
+The portfolio includes the infrastructure **and its evidence**: tested containers, immutable GHCR images, Helm, Argo CD, network boundaries, monitoring, load measurements, and controlled failures. This is a local engineering demo with signed guest sessions, not a hosted commercial service.
 
----
+## Run it
 
-## Architecture
+Install Docker with Compose, then:
 
-```text
-                         ┌──────────────────┐
-                         │     React UI      │
-                         │                  │
-                         │  Chat / WebSocket │
-                         └────────┬─────────┘
-                                  │
-                           WebSocket / HTTP
-                                  │
-                                  ▼
-                    ┌─────────────────────────┐
-                    │      Pulse Gateway      │
-                    │        FastAPI          │
-                    │                         │
-                    │  WebSocket Connections │
-                    │  REST API              │
-                    │  Connection Manager    │
-                    └───────┬─────────┬───────┘
-                            │         │
-                       Pub/Sub        │ SQL
-                            │         │
-                            ▼         ▼
-                    ┌────────────┐  ┌────────────┐
-                    │   Redis    │  │ PostgreSQL │
-                    │            │  │            │
-                    │ Pub/Sub    │  │ Messages   │
-                    │ Presence   │  │ History    │
-                    └────────────┘  └────────────┘
+```sh
+git clone https://github.com/Muzammilpinger/Pulse.git
+cd Pulse
+docker compose up -d --build --wait
 ```
 
-### Message flow
+Open **[localhost:8085](http://localhost:8085)**. Pick a display name. Open an incognito window as a second guest and send a message. Voice needs microphone permission and two guests in the same channel. TURN is optional for local direct calls; follow the [voice setup](docs/VOICE.md) for forced relay.
 
-When a user sends a message:
+All published ports bind to localhost. Two gateways run by default; PostgreSQL and Redis have no host ports. `docker compose stop` preserves chat history.
 
-```text
-Browser
-   │
-   │ WebSocket
-   ▼
-FastAPI Gateway
-   │
-   │ Save
-   ▼
-PostgreSQL
-   │
-   │ Publish
-   ▼
-Redis Pub/Sub
-   │
-   │ Subscribe
-   ▼
-Gateway Redis Listener
-   │
-   │ Broadcast
-   ▼
-Connected WebSocket clients
-```
+<details>
+<summary><strong>Run the checks yourself</strong></summary>
 
-This allows the gateway to separate message persistence from realtime message distribution.
-
----
-
-## Presence
-
-Pulse also maintains a realtime presence system using Redis.
-
-```text
-User connects
-      │
-      ▼
-Redis SET
-pulse:presence
-      │
-      ▼
-Presence event published
-      │
-      ▼
-Connected clients
-      │
-      ▼
-Online user list updated
-```
-
-When a WebSocket disconnects, the user's presence state is removed and an offline event is published.
-
----
-
-## Tech Stack
-
-### Frontend
-
-* React
-* Vite
-* Native WebSocket API
-
-### Backend
-
-* Python
-* FastAPI
-* Uvicorn
-* SQLAlchemy
-* WebSockets
-
-### Infrastructure
-
-* Redis
-* PostgreSQL
-* Docker
-* Docker Compose
-
-### Testing
-
-* Pytest
-
----
-
-## Project Structure
-
-```text
-pulse-app/
-│
-├── client/
-│   ├── src/
-│   │   ├── chat/
-│   │   │   ├── Chat.jsx
-│   │   │   ├── Chat.css
-│   │   │   └── websocket.js
-│   │   ├── call/
-│   │   └── components/
-│   ├── index.html
-│   ├── package.json
-│   └── package-lock.json
-│
-├── gateway/
-│   ├── app/
-│   │   ├── routes/
-│   │   │   ├── health.py
-│   │   │   ├── messages.py
-│   │   │   └── websocket.py
-│   │   ├── connection_manager.py
-│   │   ├── database.py
-│   │   ├── main.py
-│   │   ├── models.py
-│   │   └── pubsub.py
-│   │
-│   ├── tests/
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── signaling/
-│
-├── docs/
-│   ├── adr/
-│   ├── ARCHITECTURE.md
-│   ├── LOAD_TEST_RESULTS.md
-│   ├── RUNBOOK.md
-│   └── THREAT_MODEL.md
-│
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
----
-
-## Running Locally
-
-### 1. Clone
-
-```bash
-git clone <repository-url>
-cd pulse-app
-```
-
-### 2. Backend
-
-Create a virtual environment:
-
-```bash
+```sh
 python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r gateway/requirements.txt
-```
-
-Start Redis and PostgreSQL using Docker:
-
-```bash
-docker compose up -d
-```
-
-Start the FastAPI gateway:
-
-```bash
-uvicorn app.main:app --reload --port 8001
-```
-
-### 3. Frontend
-
-```bash
+.venv/bin/pip install -r tests/requirements.txt
+.venv/bin/pytest -q tests
 cd client
-npm install
-npm run dev
+npm ci
+npx playwright install chromium
+npm test
 ```
 
-Open:
+The backend tests use real PostgreSQL, Redis, and independent gateway ports. Browser tests cover chat, history, channel isolation, mobile input, safe text rendering, and two-peer WebRTC with synthetic microphones. See [the runbook](docs/RUNBOOK.md) for Kubernetes and failure experiments.
 
-```text
-http://localhost:5173
+</details>
+
+<details>
+<summary><strong>Welcome screen and mobile view</strong></summary>
+
+![Welcome to Pulse](docs/images/welcome.png)
+<p align="center"><img src="docs/images/mobile.png" alt="Pulse on a 390-pixel mobile viewport" width="320"></p>
+
+</details>
+
+**Watch:** [2-minute walkthrough](https://github.com/Muzammilpinger/Pulse/releases/download/v3.0.0/pulse-walkthrough.mp4) · [45-second clip](https://github.com/Muzammilpinger/Pulse/releases/download/v3.0.0/pulse-short.mp4) · [Live scaling](https://github.com/Muzammilpinger/Pulse/releases/download/v3.0.0/pulse-scaling.mp4) · [Gateway recovery](https://github.com/Muzammilpinger/Pulse/releases/download/v3.0.0/pulse-recovery.mp4)
+
+## Small product, visible engineering
+
+| In the workspace | Underneath |
+|---|---|
+| Public channels and durable history | PostgreSQL commit before Redis publication; canonical message IDs |
+| Online members across replicas | Per-connection presence leases; multiple tabs handled independently |
+| Reconnection and older messages | ID-based history merge, recent catch-up, cursor pagination |
+| Two-person audio, mute, explicit rejoin | Bounded signaling, queued ICE, direct or TURN-relayed media |
+| Desktop and mobile layouts | Keyboard message input, search over loaded messages, connection feedback |
+
+```mermaid
+flowchart LR
+  A[Browser A] --> N[Ingress / Nginx]
+  B[Browser B] --> N
+  N --> G1[Gateway A]
+  N --> G2[Gateway B]
+  G1 & G2 --> P[(PostgreSQL history)]
+  G1 & G2 <--> R[(Redis fan-out + presence)]
+  N --> S[Signaling]
+  A <-.->|WebRTC · direct or TURN| B
 ```
 
----
+[Architecture and delivery semantics](docs/ARCHITECTURE.md) · [Decision records](docs/adr) · [Threat model](docs/THREAT_MODEL.md)
 
-## Environment Variables
+## Evidence, with boundaries
 
-Copy the example environment file:
+| Check | Observed result | Inspect |
+|---|---|---|
+| Cross-instance fan-out | 100 clients received all 1,000 expected deliveries; p95 21.16 ms | [Load report](docs/LOAD_TEST_RESULTS.md) |
+| Autoscaling mechanics | 80 sockets, 92,800 deliveries, zero recorded errors; 2 → 4 → 5 gateways | [HPA observation](docs/evidence/hpa-scaling.json) |
+| Gateway replacement | Browser reconnected in 7.878 s, retained history, sent again | [Recovery observation](docs/evidence/gateway-recovery.json) |
+| Forced TURN | Both local peers selected relay candidates and received media bytes | [ICE evidence](docs/evidence/turn-relay.json) |
+| Delivery pipeline | Tests, scans, and multi-architecture publication passed | [Recorded CI run](https://github.com/Muzammilpinger/Pulse/actions/runs/35790737059) |
+| GitOps repair | Broken replacement image failed; two gateways stayed ready; Git revision restored | [Rollout observation](docs/evidence/gitops-rollback.json) |
+| Security boundaries | Denied secret access and forbidden network path; invalid resource policy rejected | [Evidence directory](docs/evidence) |
+| Monitoring | Real gateway-down alert fired and cleared after restoration | [Alert observation](docs/evidence/monitoring-alert.json) |
 
-```bash
-cp .env.example .env
+These are **local, bounded experiments**, not a throughput ceiling, uptime promise, or internet latency benchmark. The first HPA attempt did not scale because metrics were unavailable; [that failed observation is retained](docs/evidence/hpa-unavailable.json). Short fan-out runs were repeated rather than presenting one favorable number as capacity.
+
+## From commit to running pods
+
+```mermaid
+flowchart LR
+  C[Commit] --> T[Integration + browser tests]
+  T --> I[Build + Trivy scan]
+  I --> R[GHCR · commit SHA]
+  R --> V[Reviewed desired-state update]
+  V --> A[Argo CD manual sync]
+  A --> K[Kubernetes readiness]
+  K --> O[Prometheus + Grafana]
 ```
 
-Configure the required database and Redis connection values.
+![Argo CD showing the real Pulse deployment](docs/images/gitops.png)
 
-`.env` is intentionally excluded from Git.
+The [Helm chart](deploy/helm/pulse) includes resource limits, probes, a disruption budget, restricted workloads, default-deny policies, and optional HPA. [GitOps values](deploy/helm/pulse/values-gitops.yaml) pin a verified image revision. Desired state lives in this repository so the demo has one auditable source. The [local addon installer](scripts/addons-up.sh) pins Argo CD, Traefik, Kyverno, metrics-server, and Sealed Secrets versions.
 
----
+![Grafana with real scraped Pulse metrics](docs/images/operations.png)
 
-## V1 Limitations
+```sh
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+# Grafana: http://localhost:3000/d/pulse-operations
+```
 
-Pulse V1 is intentionally focused on the core realtime architecture.
+## What this release does not promise
 
-The following are planned rather than production-ready:
+- **Identity:** display names are unverified guest aliases; channels are public. Sessions expire, but established sockets are not periodically reauthenticated.
+- **Delivery:** Redis Pub/Sub cannot replay events. A crash between database commit and publication can leave a message visible only in history. No exactly-once guarantee.
+- **High availability:** PostgreSQL, Redis, and signaling are single-instance demo services. Signaling restarts end calls. Local storage is not database HA.
+- **Voice quality:** automated tests use synthetic microphones and local networks. TURN evidence does not prove every real-world NAT path. Voice outcome counters are untrusted browser reports, counted per peer.
+- **Operations:** local demo credentials, loopback ports, no public hosting, no alert notification destination. The image gate covers fixable critical findings at scan time, not all vulnerabilities forever.
 
-* Authentication
-* Private rooms
-* Message delivery guarantees
-* Horizontal gateway scaling
-* Production deployment
-* Kubernetes orchestration
-* Advanced observability
-* Voice/video calling
+Future work is deliberately separate: verified accounts, private-room authorization, a transactional outbox, idempotent sends, database migrations/backups/HA, short-lived TURN credentials, multi-network voice testing, and richer abuse controls. Video, screen sharing, mobile apps, and an SFU are outside v3.0.
 
-These are planned for future versions.
+## Explore the repository
 
----
+| Path | Purpose |
+|---|---|
+| [`client/`](client) | React workspace and browser tests |
+| [`gateway/`](gateway) | Chat, history, sessions, presence, and metrics |
+| [`signaling/`](signaling) | Two-peer WebRTC coordination |
+| [`deploy/`](deploy) | Compose monitoring, Helm, kind, Argo CD, policies |
+| [`scripts/`](scripts) | Reproducible measurements, fault experiments, screenshots |
+| [`docs/evidence/`](docs/evidence) | Actual recorded outputs and explicit test scope |
 
-## Roadmap
+[Case study](docs/CASE_STUDY.md) · [Release checklist](docs/RELEASE_CHECKLIST.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
-### V1 — Realtime Chat
-
-* [x] React client
-* [x] FastAPI gateway
-* [x] WebSocket messaging
-* [x] Redis Pub/Sub
-* [x] Persistent messages
-* [x] Presence
-* [x] Docker infrastructure
-* [x] Basic tests
-* [x] Documentation
-
-### V2 — Distributed System
-
-* [ ] Authentication
-* [ ] User accounts
-* [ ] Private rooms
-* [ ] Improved presence architecture
-* [ ] Multiple gateway instances
-* [ ] Redis-backed distributed coordination
-* [ ] Load testing
-
-### V3 — Production Infrastructure
-
-* [ ] Dockerized production deployment
-* [ ] Kubernetes
-* [ ] Ingress
-* [ ] Horizontal scaling
-* [ ] Helm
-* [ ] CI/CD
-* [ ] Prometheus
-* [ ] Grafana
-* [ ] Centralized logging
-
-### V4 — Communication Platform
-
-* [ ] Voice calls
-* [ ] Video calls
-* [ ] WebRTC
-* [ ] File sharing
-* [ ] Notifications
-* [ ] Message delivery/read states
-
----
-
-## Why Pulse?
-
-Pulse is primarily a learning and engineering project.
-
-The goal is to understand the infrastructure behind realtime applications rather than simply assembling existing services.
-
-The project provides practical experience with:
-
-* Event-driven architecture
-* WebSockets
-* Pub/Sub systems
-* Async Python
-* Database persistence
-* Distributed systems concepts
-* Containerization
-* Realtime state management
-* Backend/frontend communication
-* Production infrastructure
-
----
-
-## Status
-
-**Current release: V1.0.0**
-
-Pulse V1 is functional and focused on demonstrating the core realtime communication architecture.
-
-Built as an engineering and learning project.
+<sub>Sample conversations are presentation fixtures created through the real API. Screenshots show the running application. The original v1.0.0 tag is preserved; later work is committed with its actual dates.</sub>

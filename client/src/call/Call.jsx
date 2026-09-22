@@ -59,9 +59,14 @@ export default function Call({ room, token, onClose }) {
           .catch(() => setStatus("Tap the audio player to hear your peer"));
       };
       pc.onconnectionstatechange = () => {
-        if (gen === generation.current && socket.readyState === 1 &&
-            ["connected", "failed"].includes(pc.connectionState))
-          socket.send(JSON.stringify({ type: "peer-state", state: pc.connectionState }));
+        if (
+          gen === generation.current &&
+          socket.readyState === 1 &&
+          ["connected", "failed"].includes(pc.connectionState)
+        )
+          socket.send(
+            JSON.stringify({ type: "peer-state", state: pc.connectionState }),
+          );
         if (gen === generation.current)
           setStatus(
             {

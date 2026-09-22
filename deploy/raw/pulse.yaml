@@ -77,6 +77,8 @@ spec:
     - from:
         - podSelector:
             matchLabels: {app: client}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
       ports: [{port: 8002, protocol: TCP}]
 ---
 # Source: pulse/templates/network.yaml

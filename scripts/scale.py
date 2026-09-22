@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import time
 from datetime import datetime, timezone
 
@@ -10,7 +11,7 @@ from websockets.asyncio.client import connect
 
 
 async def main():
-    base = "http://localhost:8088/api"
+    base = os.getenv("PULSE_URL", "http://localhost:8088") + "/api"
     sockets = []
     counts = {"sent": 0, "received": 0, "errors": 0}
     samples = []
@@ -21,7 +22,9 @@ async def main():
             token = (
                 await http.post(base + "/session", json={"username": f"scale-{run_id}-{i}"})
             ).json()["token"]
-            socket = await connect(f"ws://localhost:8088/api/ws?room=scale-{run_id}&token={token}")
+            socket = await connect(
+                f"{base.replace('http', 'ws')}/ws?room=scale-{run_id}&token={token}"
+            )
             while json.loads(await socket.recv())["type"] != "ready":
                 pass
             sockets.append(socket)
@@ -81,8 +84,9 @@ async def main():
         "samples": samples,
         "scope": "Local kind HPA mechanics demonstration; deliberately sensitive CPU target, not a capacity estimate. Existing sockets stay on original pods.",
     }
-    with open("docs/evidence/hpa-scaling.json", "w") as output:
+    with open(os.getenv("PULSE_OUTPUT", "docs/evidence/hpa-scaling.json"), "w") as output:
         json.dump(result, output, indent=2)
+    assert counts["errors"] == 0 and counts["received"] == counts["sent"] * 80, counts
     print(
         json.dumps(
             {"counts": counts, "replicas": [s["status"].get("currentReplicas") for s in samples]},

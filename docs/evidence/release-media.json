@@ -1,0 +1,26 @@
+[
+  {
+    "name": "pulse-walkthrough.mp4",
+    "durationSeconds": 146.52,
+    "bytes": 2797602,
+    "sha256": "8ffd2808e2ae3e76d376d5a88bc53d2995f3cd2781e724cbb055d20501cf3da1"
+  },
+  {
+    "name": "pulse-recovery.mp4",
+    "durationSeconds": 27.72,
+    "bytes": 608665,
+    "sha256": "e5207eeac9fb99ac8a15ff2bd7bed587fc021603d8a293faf7b61a6adb16643c"
+  },
+  {
+    "name": "pulse-short.mp4",
+    "durationSeconds": 45.08,
+    "bytes": 1031646,
+    "sha256": "9276693c96b2e14b8628cd5e3276e87e5f01cd7019be87537ddc630cb59c3dff"
+  },
+  {
+    "name": "pulse-scaling.mp4",
+    "durationSeconds": 121.12,
+    "bytes": 1543095,
+    "sha256": "3d07055a519c98659f1ef6e372ecc9a516363ac79087cad72e88b4b26ea3f0f5"
+  }
+]

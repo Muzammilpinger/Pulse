@@ -1,0 +1,10 @@
+{
+  "experiment": "delete attached gateway pod",
+  "date": "2026-09-22T22:12:13.072Z",
+  "before": "gateway-64779586b4-vcmpg",
+  "after": "gateway-64779586b4-kbc6j",
+  "recoveryMs": 7420,
+  "persistedMessageVisible": true,
+  "newMessageDelivered": true,
+  "limitations": "One local graceful pod deletion; not node loss, not internet failover."
+}

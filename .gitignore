@@ -39,3 +39,6 @@ client/playwright-report/
 
 .env.*
 !.env.example
+
+# Recorded release videos (uploaded as release assets)
+artifacts/

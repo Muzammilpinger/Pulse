@@ -1,8 +1,8 @@
-# Immutable images from verified CI run 35748972930.
+# Immutable images from verified CI run 35790737059.
 images:
-  gateway: ghcr.io/muzammilpinger/pulse-gateway:6e46825beb747340b5d807f9f04b222a16334d55
-  client: ghcr.io/muzammilpinger/pulse-client:6e46825beb747340b5d807f9f04b222a16334d55
-  signaling: ghcr.io/muzammilpinger/pulse-signaling:6e46825beb747340b5d807f9f04b222a16334d55
+  gateway: ghcr.io/muzammilpinger/pulse-gateway:fdae07c473479c356517a763feb6d5a3bed2c58e
+  client: ghcr.io/muzammilpinger/pulse-client:fdae07c473479c356517a763feb6d5a3bed2c58e
+  signaling: ghcr.io/muzammilpinger/pulse-signaling:fdae07c473479c356517a763feb6d5a3bed2c58e
 allowedOrigins: http://localhost:8088,http://localhost:8089
 ingress:
   enabled: true

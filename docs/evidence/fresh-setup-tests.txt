@@ -1,3 +1,3 @@
 Isolated project pulse-fresh-check; new empty PostgreSQL volume.
-.....                                                                    [100%]
-5 passed in 0.85s
+......                                                                   [100%]
+6 passed in 0.88s

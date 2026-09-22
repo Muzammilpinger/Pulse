@@ -26,3 +26,5 @@ The demo defaults in Compose are conspicuously local-only examples, not operatio
 ## Secret handling
 
 `scripts/cluster-up.sh` generates random secrets in memory and sends them directly to the Kubernetes API. They are not committed. Kubernetes Secrets are base64 objects, not encryption by themselves. For GitOps, provision the secret separately or encrypt it with an environment-owned Sealed Secrets controller. Do not commit a plaintext Secret manifest.
+
+The local Sealed Secrets round trip and Kyverno resource-bounds rejection are recorded in `docs/evidence`. The secret scan records its tool version, scanned commit, exclusions, and zero findings; it is a bounded automated check, not a universal guarantee. Voice peer outcome reports are untrusted and may be falsified by clients; allowed labels and per-connection deduplication limit metric cardinality but do not make reports authoritative.

@@ -1,0 +1,37 @@
+rule_files:
+  - ../deploy/observability/alerts.yml
+evaluation_interval: 5s
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="pulse-gateway",instance="one"}'
+        values: '0+0x12'
+      - series: 'pulse_errors_total{instance="one"}'
+        values: '0+120x12'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: PulseGatewayUnavailable
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: PulseGatewayUnavailable
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations: {summary: No gateway is reachable}
+      - eval_time: 10m
+        alertname: PulseErrorSpike
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations: {summary: Pulse message errors exceed one per second}
+  - interval: 1m
+    input_series:
+      - series: 'up{job="pulse-gateway",instance="one"}'
+        values: '1+0x12'
+      - series: 'pulse_errors_total{instance="one"}'
+        values: '0+0x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: PulseGatewayUnavailable
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: PulseErrorSpike
+        exp_alerts: []

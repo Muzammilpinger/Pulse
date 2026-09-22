@@ -142,20 +142,24 @@ def test_signaling_negotiation_capacity_and_cleanup():
 def test_voice_outcomes_are_bounded_and_not_forwarded():
     def count():
         rows = httpx.get(f"{SIGNAL}/metrics").text.splitlines()
-        return sum(float(row.split()[-1]) for row in rows if row.startswith('pulse_voice_peer_results_total{outcome="connected"}'))
+        return sum(
+            float(row.split()[-1])
+            for row in rows
+            if row.startswith('pulse_voice_peer_results_total{outcome="connected"}')
+        )
 
     async def run():
         before = count()
         url = f"{SIGNAL.replace('http', 'ws')}/ws/metrics-{uuid.uuid4().hex[:8]}?token={session('metrics')}"
         async with connect(url) as a, connect(url) as b:
-            await event(a, 'peer-ready')
-            await event(b, 'peer-ready')
-            for state in ['connected', 'connected', 'arbitrary-label']:
-                await a.send(json.dumps({'type': 'peer-state', 'state': state}))
-            await a.send(json.dumps({'type': 'offer', 'sdp': 'barrier'}))
+            await event(a, "peer-ready")
+            await event(b, "peer-ready")
+            for state in ["connected", "connected", "arbitrary-label"]:
+                await a.send(json.dumps({"type": "peer-state", "state": state}))
+            await a.send(json.dumps({"type": "offer", "sdp": "barrier"}))
             # The next peer event must be the offer, not telemetry.
-            assert json.loads(await b.recv()) == {'type': 'offer', 'sdp': 'barrier'}
+            assert json.loads(await b.recv()) == {"type": "offer", "sdp": "barrier"}
             assert count() == before + 1
-            assert 'arbitrary-label' not in httpx.get(f"{SIGNAL}/metrics").text
+            assert "arbitrary-label" not in httpx.get(f"{SIGNAL}/metrics").text
 
     asyncio.run(run())
