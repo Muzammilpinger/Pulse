@@ -1,0 +1,3 @@
+Gateway pods: gateway-5f5f8c74bd-j4n5t, gateway-5f5f8c74bd-nzff8
+....                                                                     [100%]
+4 passed, 1 deselected in 7.01s

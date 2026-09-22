@@ -18,8 +18,9 @@ redis:
   image: redis:8-alpine
 ingress:
   enabled: false
-  className: nginx
+  className: traefik
   host: pulse.local
+  annotations: {}
   tlsSecret: ""
 autoscaling:
   enabled: false

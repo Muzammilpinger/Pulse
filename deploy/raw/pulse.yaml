@@ -198,6 +198,12 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8001"
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {app: gateway}
       serviceAccountName: pulse
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 40
@@ -335,8 +341,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: RollingUpdate
-    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+    type: Recreate
   selector:
     matchLabels: {app: signaling}
   template:

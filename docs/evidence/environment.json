@@ -1,0 +1,20 @@
+{
+  "recorded_at": "2026-09-22T15:37:58.465545+00:00",
+  "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M4",
+  "host_memory_bytes": 17179869184,
+  "docker": "29.6.2",
+  "kubernetes": "v1.33.1",
+  "topology": "kind: one control plane, two workers; Docker Desktop VM shared with Compose",
+  "gateway_resources": {
+    "requests": {
+      "cpu": "100m",
+      "memory": "128Mi"
+    },
+    "limits": {
+      "cpu": "500m",
+      "memory": "256Mi"
+    }
+  },
+  "commit_at_recording": "c33d292d81650d7c402bcf4bf1d63f80746d4dd0"
+}

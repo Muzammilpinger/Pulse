@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-22T11:08:10.177Z",
+  "mode": "iceTransportPolicy=relay",
+  "peers": [
+    {
+      "localCandidateType": "relay",
+      "remoteCandidateType": "relay",
+      "connectionState": "connected",
+      "bytesReceived": 13523
+    },
+    {
+      "localCandidateType": "relay",
+      "remoteCandidateType": "relay",
+      "connectionState": "connected",
+      "bytesReceived": 13651
+    }
+  ],
+  "scope": "Two local Chromium sessions, synthetic microphones, coturn through Docker Desktop; not a multi-network NAT test."
+}

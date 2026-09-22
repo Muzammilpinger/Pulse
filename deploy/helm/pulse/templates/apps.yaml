@@ -5,10 +5,16 @@ kind: Deployment
 metadata:
   name: {{ $name }}
 spec:
+  {{- if not (and (eq $name "gateway") $.Values.autoscaling.enabled) }}
   replicas: {{ if eq $name "gateway" }}{{ $.Values.gatewayReplicas }}{{ else }}1{{ end }}
+  {{- end }}
   strategy:
+    {{- if eq $name "signaling" }}
+    type: Recreate
+    {{- else }}
     type: RollingUpdate
     rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+    {{- end }}
   selector:
     matchLabels: {app: {{ $name }}}
   template:
@@ -18,6 +24,14 @@ spec:
         prometheus.io/scrape: {{ if eq $name "gateway" }}"true"{{ else }}"false"{{ end }}
         prometheus.io/port: "8001"
     spec:
+      {{- if eq $name "gateway" }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {app: gateway}
+      {{- end }}
       serviceAccountName: pulse
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 40

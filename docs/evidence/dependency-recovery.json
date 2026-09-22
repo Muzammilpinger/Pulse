@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-22T11:08:38.943549+00:00",
+  "experiments": [
+    {
+      "service": "redis",
+      "during_outage_readiness": 503,
+      "stop_to_ready_seconds": 2.27,
+      "application_probe_attempts": 2,
+      "cross_gateway_after_recovery": true,
+      "stop_to_chat_seconds": 3.92
+    },
+    {
+      "service": "postgres",
+      "during_outage_readiness": 503,
+      "stop_to_ready_seconds": 1.12,
+      "application_probe_attempts": 1,
+      "cross_gateway_after_recovery": true,
+      "stop_to_chat_seconds": 1.42
+    }
+  ],
+  "scope": "Graceful local Compose restarts; no volume deletion or data corruption."
+}

@@ -1,0 +1,4 @@
+gateway -> redis: 0
+signaling -> redis: 11
+no
+PASS: allowed path works, forbidden path fails, application cannot read secrets.

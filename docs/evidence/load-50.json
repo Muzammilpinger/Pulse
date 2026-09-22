@@ -1,0 +1,15 @@
+{
+  "environment": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "clients": 50,
+  "messages": 10,
+  "deliveries": 500,
+  "connection_seconds": 0.317,
+  "duration_seconds": 5.628,
+  "latency_ms": {
+    "p50": 8.19,
+    "p95": 23.35,
+    "max": 23.42
+  },
+  "errors": 0,
+  "note": "Sequential message fan-out; includes deliberate 550ms pacing. Not a saturation benchmark."
+}

@@ -1,0 +1,12 @@
+
+> pulse-client@1.0.0 test
+> playwright test
+
+
+Running 3 tests using 1 worker
+
+  ✓  1 tests/workspace.spec.js:8:5 › two guests exchange persisted messages, switch channels, and search (5.6s)
+  ✓  2 tests/workspace.spec.js:35:5 › mobile layout, keyboard send, safe text rendering, and logout (3.6s)
+  ✓  3 tests/workspace.spec.js:56:5 › two browsers establish WebRTC audio and cleanly leave (5.2s)
+
+  3 passed (14.9s)
