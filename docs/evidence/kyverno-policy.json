@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-22T15:42:15.042113+00:00",
+  "missing_resources_rejected": true,
+  "bounded_resources_accepted": true,
+  "rejection": "Error from server: error when creating \"STDIN\": admission webhook \"validate.kyverno.svc-fail\" denied the request: \n\nresource Pod/pulse/policy-proof was blocked due to the following policies \n\npulse-require-resource-bounds:\n  resource-bounds: 'validation error: Pulse containers need CPU and memory requests and limits. rule resource-bounds failed at path /spec/containers/0/resources/limits/'\n",
+  "accepted": "pod/policy-proof created (server dry run)\n",
+  "scope": "Server-side dry-run admission; no fixture pod was persisted."
+}

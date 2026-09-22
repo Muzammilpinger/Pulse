@@ -1,5 +1,10 @@
-# Replace all three tags with the SAME successful CI commit SHA before syncing.
+# Immutable images from verified CI run 35748972930.
 images:
-  gateway: ghcr.io/muzammilpinger/pulse-gateway:replace-with-commit-sha
-  client: ghcr.io/muzammilpinger/pulse-client:replace-with-commit-sha
-  signaling: ghcr.io/muzammilpinger/pulse-signaling:replace-with-commit-sha
+  gateway: ghcr.io/muzammilpinger/pulse-gateway:6e46825beb747340b5d807f9f04b222a16334d55
+  client: ghcr.io/muzammilpinger/pulse-client:6e46825beb747340b5d807f9f04b222a16334d55
+  signaling: ghcr.io/muzammilpinger/pulse-signaling:6e46825beb747340b5d807f9f04b222a16334d55
+allowedOrigins: http://localhost:8088,http://localhost:8089
+ingress:
+  enabled: true
+  className: traefik
+  host: localhost
