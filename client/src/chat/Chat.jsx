@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { connectWebSocket } from "./websocket";
 import Call from "../call/Call";
+import Icon, { Mark, Brand } from "../components/Icon";
+import Welcome from "../components/Welcome";
 const channels = [
   [
     "general",
@@ -12,17 +14,6 @@ const channels = [
   ],
   ["random", "A little room for everything else."],
 ];
-const Mark = () => (
-  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-    <path
-      d="M3 17h6l4-10 6 19 4-12 3 3h3"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 const initials = (name) => name.slice(0, 2).toUpperCase();
 function Avatar({ name }) {
   return (
@@ -42,7 +33,10 @@ export default function Chat() {
     }
   });
   const [name, setName] = useState(""),
-    [room, setRoom] = useState("general"),
+    [room, setRoom] = useState(() => {
+      const saved = sessionStorage.getItem("pulse-room");
+      return channels.some(([id]) => id === saved) ? saved : "general";
+    }),
     [messages, setMessages] = useState([]),
     [input, setInput] = useState(""),
     [status, setStatus] = useState("Connecting"),
@@ -51,13 +45,34 @@ export default function Chat() {
     [busy, setBusy] = useState(false),
     [voice, setVoice] = useState(false),
     [search, setSearch] = useState(""),
-    [info, setInfo] = useState(false),
+    [info, setInfo] = useState(
+      () => window.matchMedia("(min-width: 1051px)").matches,
+    ),
     [menu, setMenu] = useState(false),
     [instance, setInstance] = useState(""),
     [older, setOlder] = useState(true);
   const socket = useRef(null),
     end = useRef(null),
     scroll = useRef(true);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1051px)");
+    const resize = () => {
+      setInfo(media.matches);
+      setMenu(false);
+    };
+    const escape = (event) => {
+      if (event.key === "Escape") {
+        setMenu(false);
+        setInfo(false);
+      }
+    };
+    media.addEventListener("change", resize);
+    window.addEventListener("keydown", escape);
+    return () => {
+      media.removeEventListener("change", resize);
+      window.removeEventListener("keydown", escape);
+    };
+  }, []);
   async function join(e) {
     e.preventDefault();
     setBusy(true);
@@ -69,24 +84,35 @@ export default function Chat() {
         body: JSON.stringify({ username: name }),
       });
       if (!res.ok)
-        throw Error("Use 2–24 letters, numbers, underscores, or hyphens.");
+        throw Error(
+          res.status === 422
+            ? "Use 2–24 letters, numbers, underscores, or hyphens."
+            : "The workspace is temporarily unavailable. Please try again.",
+        );
       const data = await res.json();
       sessionStorage.setItem("pulse-session", JSON.stringify(data));
       setSession(data);
     } catch (e) {
-      setError(e.message);
+      setError(
+        e instanceof TypeError
+          ? "Couldn’t reach Pulse. Check your connection and try again."
+          : e.message,
+      );
     } finally {
       setBusy(false);
     }
   }
   function logout() {
     sessionStorage.removeItem("pulse-session");
+    sessionStorage.removeItem("pulse-room");
+    setRoom("general");
     setSession(null);
     setVoice(false);
     setError("");
   }
   useEffect(() => {
     if (!session) return;
+    sessionStorage.setItem("pulse-room", room);
     let cancelled = false;
     const controller = new AbortController();
     setMessages([]);
@@ -180,117 +206,29 @@ export default function Chat() {
       setError("");
     } else setError("Reconnecting. Your draft is still here.");
   }
-  if (!session)
-    return (
-      <main className="welcome">
-        <div className="welcome-top">
-          <a className="brand" href="/">
-            <span className="logo">
-              <Mark />
-            </span>
-            pulse<span className="brand-dot">.</span>
-          </a>
-          <span className="eyebrow">A LITTLE CLOSER, IN REAL TIME</span>
-          <a href="https://github.com/Muzammilpinger/Pulse">
-            View the source ↗
-          </a>
-        </div>
-        <div className="welcome-grid">
-          <section className="welcome-story">
-            <div className="eyebrow">
-              <span className="dot" /> BUILT FOR THE CONVERSATION
-            </div>
-            <h1>
-              Good ideas
-              <br />
-              need a place
-              <br />
-              to <em>connect.</em>
-            </h1>
-            <p>
-              A quiet space for fast conversations.
-              <br />
-              Open a channel, find your people, and keep
-              <br />
-              the momentum going.
-            </p>
-            <div className="story-bottom">
-              <span className="mini-wave">
-                <Mark />
-              </span>
-              <span>
-                Real-time messaging. Human connection.
-                <br />
-                <small>An open-source engineering project by Muzammil.</small>
-              </span>
-            </div>
-          </section>
-          <section className="join-card">
-            <span className="tag">YOUR NEXT CONVERSATION STARTS HERE</span>
-            <h2>
-              Make yourself
-              <br />
-              at home.
-            </h2>
-            <p>Choose a name and step into the workspace.</p>
-            <form onSubmit={join}>
-              <label htmlFor="username">Display name</label>
-              <input
-                id="username"
-                autoComplete="nickname"
-                placeholder="e.g. muzammil"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                pattern={"[a-zA-Z0-9_\\-]{2,24}"}
-                minLength={2}
-                maxLength={24}
-                required
-              />
-              <small>2–24 characters. Letters, numbers, _ or -.</small>
-              {error && (
-                <p className="error" role="alert">
-                  {error}
-                </p>
-              )}
-              <button className="primary" disabled={busy}>
-                {busy ? "Opening workspace…" : "Enter workspace"} <span>↗</span>
-              </button>
-            </form>
-            <div className="join-note">
-              <span className="dot" /> Guest access · No account needed
-            </div>
-            <p className="privacy">
-              This is a public portfolio demo. Display names are unverified, and
-              messages are visible to everyone in the room.
-            </p>
-          </section>
-        </div>
-        <footer className="welcome-footer">
-          <span>INDEPENDENTLY BUILT. OPEN BY DESIGN.</span>
-          <span>React / FastAPI / Redis / PostgreSQL</span>
-          <span>01 — CONNECT</span>
-        </footer>
-      </main>
-    );
+  if (!session) return <Welcome {...{ name, setName, busy, error, join }} />;
   const filtered = messages.filter((m) =>
     `${m.sender_id} ${m.content}`.toLowerCase().includes(search.toLowerCase()),
   );
   return (
     <main className="workspace">
+      {menu && (
+        <button
+          className="drawer-backdrop"
+          aria-label="Close channels"
+          onClick={() => setMenu(false)}
+        />
+      )}
       <aside className={`sidebar ${menu ? "open" : ""}`}>
-        <a className="brand" href="/">
-          <span className="logo">
-            <Mark />
-          </span>
-          pulse<span className="brand-dot">.</span>
-          <span className="tag">WORKSPACE</span>
-        </a>
+        <Brand />
         <div className="workspace-name">
           <span className="workspace-icon">P</span>
           <div>
-            Pulse community<small>A space to build together</small>
+            Pulse community
+            <small>
+              <Icon name="globe" /> Public workspace
+            </small>
           </div>
-          <span>⌄</span>
         </div>
         <div className="sidebar-label">
           YOUR CHANNELS <span>03</span>
@@ -299,6 +237,7 @@ export default function Chat() {
           {channels.map(([id]) => (
             <button
               key={id}
+              aria-current={room === id ? "page" : undefined}
               className={`channel ${room === id ? "active" : ""}`}
               onClick={() => {
                 setRoom(id);
@@ -321,16 +260,16 @@ export default function Chat() {
             setMenu(false);
           }}
         >
-          <span>♧</span> The lounge <span className="tag">1:1</span>
+          <Icon name="headphones" /> The lounge <span className="tag">1:1</span>
         </button>
         <div className="sidebar-card">
           <span className="eyebrow">SMALL SPACE. BIG IDEAS.</span>
           <h3>
-            Keep the
+            Find your
             <br />
-            conversation flowing.
+            frequency.
           </h3>
-          <p>Your next good idea might start with a hello.</p>
+          <p>A good conversation can change your whole day.</p>
           <Mark />
         </div>
         <div className="profile">
@@ -350,7 +289,7 @@ export default function Chat() {
             title="Leave workspace"
             onClick={logout}
           >
-            ↪
+            <Icon name="logout" />
           </button>
         </div>
       </aside>
@@ -360,8 +299,9 @@ export default function Chat() {
             className="mobile-menu icon-button"
             onClick={() => setMenu(!menu)}
             aria-label="Toggle channels"
+            aria-expanded={menu}
           >
-            ☰
+            <Icon name="menu" />
           </button>
           <span className="header-hash">#</span>
           <div>
@@ -369,15 +309,32 @@ export default function Chat() {
             <p>{channels.find(([id]) => id === room)[1]}</p>
           </div>
           <div className="header-actions">
-            <button className="subtle" onClick={() => setVoice(!voice)}>
-              ♧ <span>Join voice</span>
+            <div
+              className="header-members"
+              title={`${users.length} people online`}
+            >
+              <div className="avatar-stack">
+                {users.slice(0, 3).map((user) => (
+                  <Avatar key={user} name={user} />
+                ))}
+              </div>
+              <span>{users.length} online</span>
+            </div>
+            <button
+              className="subtle voice-trigger"
+              aria-label="Join voice"
+              aria-pressed={voice}
+              onClick={() => setVoice(!voice)}
+            >
+              <Icon name="headphones" /> <span>Join voice</span>
             </button>
             <button
               className={`icon-button ${info ? "selected" : ""}`}
               aria-label="Channel details"
+              aria-expanded={info}
               onClick={() => setInfo(!info)}
             >
-              ⓘ
+              <Icon name="info" />
             </button>
           </div>
         </header>
@@ -387,7 +344,7 @@ export default function Chat() {
               className={`dot ${status !== "Connected" ? "offline" : ""}`}
             />
             {status === "Connected"
-              ? "You’re all caught up with your people."
+              ? "You’re connected. Make yourself at home."
               : status === "Session expired"
                 ? "Your session expired. Leave and join again."
                 : "Reconnecting — your draft stays safe."}
@@ -404,44 +361,79 @@ export default function Chat() {
         )}
         <div className="conversation-body">
           <div className="chat-main">
-            <div className="messages" aria-label="Messages" role="log">
+            <div
+              className="messages"
+              aria-label="Messages"
+              role="log"
+              tabIndex={0}
+            >
               <div className="channel-intro">
-                <div className="intro-icon">#</div>
-                <span className="eyebrow">
-                  A SHARED SPACE FOR GOOD CONVERSATIONS
-                </span>
-                <h2>
-                  Welcome to <span>#{room}.</span>
-                </h2>
-                <p>{channels.find(([id]) => id === room)[1]}</p>
-              </div>
-              <div className="date-divider">
-                <span>THE CONVERSATION STARTS HERE</span>
+                <div className="intro-copy">
+                  <span className="eyebrow">ROOM FOR YOUR NEXT GOOD IDEA</span>
+                  <h2>
+                    Welcome to
+                    <br />
+                    <span>#{room}.</span>
+                  </h2>
+                  <p>{channels.find(([id]) => id === room)[1]}</p>
+                  <span className="intro-public">
+                    <Icon name="globe" /> An open conversation
+                  </span>
+                </div>
+                <div className="intro-art" aria-hidden="true">
+                  <div className="intro-orbit" />
+                  <span className="intro-mark">
+                    <Mark />
+                  </span>
+                  <span className="intro-spark">✳</span>
+                  <span className="intro-bubble">
+                    <Icon name="message" />
+                  </span>
+                </div>
               </div>
               {older && messages.length > 0 && (
                 <button className="load-older" onClick={loadOlder}>
                   Load earlier messages
                 </button>
               )}
-              {filtered.map((m) => (
-                <article className="message" key={m.id}>
-                  <Avatar name={m.sender_id} />
-                  <div>
-                    <div className="message-meta">
-                      <strong>{m.sender_id}</strong>
-                      {m.sender_id === session.username && (
-                        <span className="you-tag">YOU</span>
-                      )}
-                      <time dateTime={m.created_at}>
-                        {new Date(m.created_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </time>
+              {filtered.map((m, index) => (
+                <React.Fragment key={m.id}>
+                  {(index === 0 ||
+                    new Date(filtered[index - 1].created_at).toDateString() !==
+                      new Date(m.created_at).toDateString()) && (
+                    <div className="date-divider">
+                      <span>
+                        {new Date(m.created_at).toDateString() ===
+                        new Date().toDateString()
+                          ? "Today"
+                          : new Date(m.created_at).toLocaleDateString([], {
+                              month: "long",
+                              day: "numeric",
+                            })}
+                      </span>
                     </div>
-                    <p>{m.content}</p>
-                  </div>
-                </article>
+                  )}
+                  <article
+                    className={`message ${m.sender_id === session.username ? "own-message" : ""}`}
+                  >
+                    <Avatar name={m.sender_id} />
+                    <div>
+                      <div className="message-meta">
+                        <strong>{m.sender_id}</strong>
+                        {m.sender_id === session.username && (
+                          <span className="you-tag">YOU</span>
+                        )}
+                        <time dateTime={m.created_at}>
+                          {new Date(m.created_at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </time>
+                      </div>
+                      <p>{m.content}</p>
+                    </div>
+                  </article>
+                </React.Fragment>
               ))}
               {search && !filtered.length && (
                 <p className="empty-search">No messages match “{search}”.</p>
@@ -488,7 +480,7 @@ export default function Chat() {
                     disabled={!input.trim() || status !== "Connected"}
                     aria-label="Send message"
                   >
-                    Send <span>↗</span>
+                    Send <Icon name="arrow" />
                   </button>
                 </div>
               </form>
@@ -502,7 +494,7 @@ export default function Chat() {
           </div>
           <aside className={`details ${info ? "show" : ""}`}>
             <label className="search-box">
-              <span>⌕</span>
+              <Icon name="search" />
               <input
                 aria-label="Search loaded messages"
                 placeholder="Search conversation"
@@ -528,6 +520,29 @@ export default function Chat() {
                 <span className="dot" />
               </div>
             ))}
+            <div className="lounge-card">
+              <div className="lounge-card-top">
+                <Icon name="headphones" />
+                <span>THE VOICE LOUNGE</span>
+              </div>
+              <div className="lounge-wave" aria-hidden="true">
+                {[12, 25, 39, 24, 48, 32, 18, 37, 52, 29, 17, 32, 20].map(
+                  (h, i) => (
+                    <i key={i} style={{ height: h }} />
+                  ),
+                )}
+              </div>
+              <h3>Better, out loud.</h3>
+              <p>
+                For the conversations
+                <br />
+                that need a little more voice.
+              </p>
+              <button onClick={() => setVoice(true)}>
+                Open voice lounge <Icon name="arrow" />
+              </button>
+              <small>Two people. One conversation.</small>
+            </div>
             <div className="channel-about">
               <span className="eyebrow">ABOUT THIS SPACE</span>
               <h3>A little context.</h3>
@@ -543,10 +558,13 @@ export default function Chat() {
                 <span>CONNECTION</span>
                 <strong>{status}</strong>
               </div>
-              <div>
-                <span>GATEWAY</span>
+              <details className="connection-details">
+                <summary>
+                  Connection details <Icon name="chevron" />
+                </summary>
+                <span>Gateway instance</span>
                 <code>{instance || "Connecting…"}</code>
-              </div>
+              </details>
             </div>
             <a
               className="source-link"

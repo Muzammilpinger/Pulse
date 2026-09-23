@@ -1,6 +1,6 @@
 {
   "name": "pulse-client",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,7 @@
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "^1.63.0",
     "@vitejs/plugin-react": "^5.0.2",
     "prettier": "^3.9.8",

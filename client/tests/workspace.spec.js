@@ -25,6 +25,10 @@ test("two guests exchange persisted messages, switch channels, and search", asyn
   await expect(bob.getByText(message, { exact: true })).toBeVisible();
   await bob.getByRole("button", { name: "# engineering" }).click();
   await expect(bob.getByText(message, { exact: true })).toHaveCount(0);
+  await bob.reload();
+  await expect(
+    bob.getByRole("heading", { name: "engineering", exact: true }),
+  ).toBeVisible();
   await bob.getByRole("button", { name: "# general" }).click();
   await expect(bob.getByText(message, { exact: true })).toBeVisible();
   await bob.getByLabel("Search loaded messages").fill("no-match-" + stamp);
@@ -78,6 +82,14 @@ test("two browsers establish WebRTC audio and cleanly leave", async ({
   await expect(second.getByRole("status")).toHaveText("Voice connected", {
     timeout: 25000,
   });
+  const volume = first.getByLabel("Peer volume");
+  await volume.focus();
+  await volume.press("Home");
+  for (let i = 0; i < 5; i++) await volume.press("ArrowRight");
+  await expect(volume).toHaveValue("0.25");
+  expect(
+    await first.getByLabel("Peer audio").evaluate((audio) => audio.volume),
+  ).toBe(0.25);
   await first.getByRole("button", { name: "Mute", exact: true }).click();
   await expect(
     first.getByRole("button", { name: "Unmute", exact: true }),

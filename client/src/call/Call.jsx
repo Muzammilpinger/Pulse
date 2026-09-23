@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
+import Icon from "../components/Icon";
 import { wsUrl } from "../chat/websocket";
 export default function Call({ room, token, onClose }) {
   const [status, setStatus] = useState("Ready to join"),
     [muted, setMuted] = useState(false),
-    [relay, setRelay] = useState(false);
+    [relay, setRelay] = useState(false),
+    [needsPlayback, setNeedsPlayback] = useState(false),
+    [volume, setVolume] = useState(0.8);
   const resources = useRef({}),
     audio = useRef(null),
     generation = useRef(0);
@@ -18,6 +21,8 @@ export default function Call({ room, token, onClose }) {
   useEffect(() => () => cleanup(), []);
   async function join() {
     cleanup();
+    setMuted(false);
+    setNeedsPlayback(false);
     const gen = generation.current;
     setStatus("Requesting microphone");
     try {
@@ -54,9 +59,8 @@ export default function Call({ room, token, onClose }) {
       };
       pc.ontrack = (e) => {
         audio.current.srcObject = e.streams[0];
-        audio.current
-          .play()
-          .catch(() => setStatus("Tap the audio player to hear your peer"));
+        audio.current.volume = volume;
+        audio.current.play().catch(() => setNeedsPlayback(true));
       };
       pc.onconnectionstatechange = () => {
         if (
@@ -132,48 +136,103 @@ export default function Call({ room, token, onClose }) {
       setStatus(error.message || "Microphone unavailable");
     }
   }
+  const connected = status === "Voice connected";
   return (
-    <section className="call-panel" aria-label="Voice room">
-      <div>
-        <strong>
-          Voice lounge <span className="tag">1:1 AUDIO</span>
-        </strong>
+    <section
+      className={`call-panel ${connected ? "call-connected" : ""}`}
+      aria-label="Voice room"
+    >
+      <span className="call-symbol" aria-hidden="true">
+        <Icon name="headphones" />
+        <span className="call-status-dot" />
+      </span>
+      <div className="call-copy">
+        <div className="call-title">
+          <strong>The voice lounge</strong>
+          <span className="tag">{connected ? "LIVE" : "1:1 AUDIO"}</span>
+        </div>
         <p role="status">{status}</p>
       </div>
-      <audio ref={audio} autoPlay controls aria-label="Peer audio" />
-      {!resources.current.pc ? (
-        <>
-          <label className="relay">
-            <input
-              type="checkbox"
-              checked={relay}
-              onChange={(e) => setRelay(e.target.checked)}
-            />
-            Force TURN
-          </label>
-          <button onClick={join}>Join voice</button>
-        </>
-      ) : (
+      <audio ref={audio} autoPlay aria-label="Peer audio" />
+      <div className="call-controls">
+        {needsPlayback && (
+          <button
+            onClick={async () => {
+              try {
+                await audio.current.play();
+                setNeedsPlayback(false);
+              } catch {
+                setNeedsPlayback(true);
+              }
+            }}
+          >
+            Enable audio
+          </button>
+        )}
+        {!resources.current.pc ? (
+          <>
+            <label
+              className="relay"
+              title="Use the configured relay for restrictive networks"
+            >
+              <input
+                type="checkbox"
+                aria-label="Force TURN"
+                checked={relay}
+                onChange={(e) => setRelay(e.target.checked)}
+              />{" "}
+              Relay connection
+            </label>
+            <button className="call-join" onClick={join}>
+              <Icon name="headphones" /> Join voice
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="call-volume">
+              <span>Peer volume</span>
+              <input
+                type="range"
+                aria-label="Peer volume"
+                min="0"
+                max="1"
+                step="0.05"
+                value={volume}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setVolume(next);
+                  audio.current.volume = next;
+                }}
+              />
+            </label>
+            <button
+              className={`call-mute ${muted ? "is-muted" : ""}`}
+              aria-pressed={muted}
+              onClick={() => {
+                resources.current.stream
+                  .getAudioTracks()
+                  .forEach((t) => (t.enabled = muted));
+                setMuted(!muted);
+              }}
+            >
+              <Icon name={muted ? "mute" : "mic"} />
+              {muted ? "Unmute" : "Mute"}
+            </button>
+          </>
+        )}
         <button
+          className="call-leave"
+          aria-label="Leave"
+          title="Leave voice lounge"
           onClick={() => {
-            resources.current.stream
-              .getAudioTracks()
-              .forEach((t) => (t.enabled = muted));
-            setMuted(!muted);
+            cleanup();
+            onClose();
           }}
         >
-          {muted ? "Unmute" : "Mute"}
+          <Icon name="close" />
+          <span>Leave</span>
         </button>
-      )}
-      <button
-        className="subtle"
-        onClick={() => {
-          cleanup();
-          onClose();
-        }}
-      >
-        Leave
-      </button>
+      </div>
     </section>
   );
 }
